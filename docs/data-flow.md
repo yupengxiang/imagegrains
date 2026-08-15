@@ -98,9 +98,22 @@ centroid, local_centroid, bbox
 
 结果写入 `*_gsd.csv`（各百分位粒径）与 `*_perc_uncert.txt`（95% 区间等）。
 
-## 8. 竞赛扩展点
+## 8. 竞赛扩展点（src/aggregate_screening/）
 
-当前主流程直接复用即可得到：逐颗粒 a/b 轴、面积、周长、形状指标 → 数量分布。竞赛要求的"筛分等效粒径 + 质量加权分布（wᵢ=dᵢ^γ）+ D10/D50/D90"是**在 `*_grains.csv` 之上的后续加工**，对应新的独立模块（见 `docs/ai/PLAN.md`），不修改本节描述的上游路径。
+在上游主流程的 `*_grains.csv` 之上，竞赛工程层继续加工（不修改上游代码）：
+
+```text
+*_grains.csv（px 或 mm）
+  -> sieve_equivalent.load_grains_df（标准化；mm/px 双列时自动推断分辨率）
+  -> 筛分等效粒径 d_sieve = θ₁·b + θ₂·d_eq + θ₃（默认 b 轴）
+  -> 质量权重 w = d^γ（默认 γ=3）
+  -> 质量加权 D10/D50/D90 + 粒级质量占比（5-10/10-16/16-20/20-25/25-31.5/31.5-40mm）
+  -> morphology 形貌分类 + anomaly 异常检测（>50mm/<5mm/疑似泥团）
+  -> report 场景汇总（默认剔除异常物后的正常骨料口径）+ 一键 CLI 输出
+```
+
+质量加权口径与标准筛分（质量分布）对齐；`fit_calibration` 用自采筛分实验数据
+（称重 + 机械筛分真值）拟合 θ/γ。详见 `docs/architecture.md` 竞赛工程层一节。
 
 ## 建议阅读顺序
 

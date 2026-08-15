@@ -1,33 +1,28 @@
 # 当前任务计划
 
-## 当前任务：agent 文档收束（进行中/已完成）
+## 当前任务：竞赛工程层 MVP（已基本完成，2026-08-16）
 
-把从旧仓库（NeuralLagrangianSolver）带入的 agent 文档改写为本仓库（ImageGrains 竞赛 fork）的实际情况。
+在跑通官方工作流的基础上，用 demo 数据（无自采数据）完成了竞赛工程层第一版：
 
-范围：
+- `src/aggregate_screening/` 子包：sieve_equivalent / morphology / anomaly / report / app。
+- 一键 CLI：`python -m aggregate_screening --grains <csv> [--resolution] [--out_dir] [--theta] [--gamma]`。
+- 核心口径：筛分等效粒径 `d = θ₁b + θ₂d_eq + θ₃`（默认 b 轴）+ 质量加权 `w = d^γ`（默认 3）→ D10/D50/D90 + 粒级质量占比；默认剔除异常物后统计正常骨料。
+- 消融对照（答辩素材）：number D50=9.2 → mass-weighted γ=3 D50=67.1（含 67mm 异物）→ 剔除异常后 D50=18.8。
+- 26 个 pytest 通过（含合成数据拟合校验：fit_calibration 可恢复真参数）。
 
-- 重写 `AGENTS.md`、`docs/ai/*`（8 个文件）、`docs/data-flow.md`、`docs/architecture.md`。
-- 保留 `docs/task.md`（竞赛任务原文）与 `docs/insight/`（GPT 研究笔记，gitignored）。
-- 保留 `CLAUDE.md`（仅 `@AGENTS.md` 引用）。
+验证：`pytest tests/`、`python -m aggregate_screening --grains /tmp/ig_out/*_re_scaled.csv`。
 
-成功标准：
+## 下一步（依赖真实数据/硬件）
 
-- 文档中不再出现旧仓库内容（Hydra、H5、SPH、DeepSpeed、HVI、conda 环境 `neural_lagrangian_solver_torch212` 等）。
-- 文档描述的模块、函数、文件、命令与仓库实际一致（`src/imagegrains/`、`demo_data/`、`notebooks/`、`models/`、pytest 等）。
+1. **采集骨料图像 + 筛分实验**：自采 batch（称重 + 机械筛分 5/10/16/20/25/31.5/40mm + 拍照），
+   用 `fit_calibration` 校准 θ/γ，这是把误差打下去的关键（当前默认参数是经验基线）。
+2. **评估预训练模型在真实骨料上的分割质量**（漏分/粘连/误检），决定是否微调。
+3. **尺度标定**：ArUco/标尺检测 + homography 透视校正，替代固定 resolution（现场 30 分钟约束）。
+4. **泥团分类器**：当前为尺寸+凸度兜底规则；有图像 crop 后接入颜色/纹理分类。
+5. **一键应用与自动 QC**：报告已文本化输出；现场可加图形界面（Streamlit 或等价物）。
 
-验证：`grep` 检查旧关键词残留；`git diff` 目检。
+## 验收口径（竞赛导向）
 
-## 下一步：竞赛工程层 MVP（待用户确认后启动）
-
-参考 `docs/insight/` 中的 GPT 方案，按优先级推进（P0 必须，P1 加分，P2 最后）：
-
-1. P0：跑通官方工作流 —— `pip install -e .[test]` → `demo_data` 上跑 CLI/notebook，确认分割→粒径→GSD 闭环。
-2. P0：骨料图像采集与预训练模型评估 —— 拍少量真实骨料，检查分割质量（漏分/粘连/误检），决定是否微调。
-3. P0：尺度标定（ArUco 或标尺）→ 像素到 mm 的可靠换算。
-4. P0：筛分等效粒径模块 `sieve_equivalent.py`（独立子包）+ 质量加权分布 `wᵢ=dᵢ^γ` + D10/D50/D90。
-5. P1：筛分实验数据（≥10–20 个 batch，称重+机械筛分+拍照）校准 θ/γ 参数。
-6. P1：形貌分类（先规则：长宽比/圆度/凸度）与异常检测（>50 mm 阈值、泥团分类）。
-7. P2：一键式本地应用/报告（Streamlit 或等价物）与自动 QC。
-8. P2：模型微调（仅当预训练模型明显不够用时，用 `notebooks/4_train_cellposeSAM_model.ipynb`）。
-
-验收口径（竞赛导向）：D10/D50/D90 与标准筛分结果的误差、主粒径区间累计通过率误差；一切以 `docs/task.md` 与用户确认为准。
+- D10/D50/D90 与标准筛分结果误差（内部目标：D50 相对误差 <5%，D10/D90 <10%）；
+- 主粒径区间累计通过率误差 <10%；
+- 现场 30 分钟内完成 拍照 → 一键分析 → 结果输出。

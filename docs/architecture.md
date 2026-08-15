@@ -50,14 +50,27 @@ CLI 入口是 `src/imagegrains/__main__.py`（`python -m imagegrains`），只�
 - 分割/测量以 Cellpose 与 skimage 的异常为最终边界，不包装成自定义错误体系。
 - 上游代码无版本化输出目录的强约定：`--out_dir` 未指定时结果写到输入目录；跑新数据前清理旧结果文件（CLI 帮助中已注明）。
 
-## 竞赛工程层（待开发）
+## 竞赛工程层（src/aggregate_screening/）
 
-自然堆积赛道的差异化能力作为**独立新模块**增量开发，不修改上游源码：
+自然堆积赛道的差异化能力，作为独立子包开发，不修改上游源码：
 
-- 尺度标定：ArUco/标尺检测、homography 透视校正、mm/px 自动换算；
-- 筛分等效粒径：2D 投影几何（a/b、等效直径、圆度等）→ 方孔筛等效粒径的校准映射；
-- 质量加权分布：`wᵢ = dᵢ^γ` 聚合 → D10/D50/D90 与级配曲线（评分以标准筛分为基准）；
-- 形貌分类（针片状/圆形/棱角状）与异常检测（>50 mm、泥团）；
-- 一键式本地应用与自动 QC（现场 30 分钟约束）。
+| 模块 | 职责 |
+| --- | --- |
+| `sieve_equivalent.py` | 筛分等效粒径 `d_sieve = θ₁·b + θ₂·d_eq + θ₃`（默认 θ=(1,0,0) 即 b 轴）、质量加权 `w = d^γ`（默认 γ=3）、质量加权百分位 D10/D50/D90（阶梯逆 CDF）、粒级质量占比、`fit_calibration`（差分进化拟合 θ/γ，需真实筛分数据） |
+| `morphology.py` | 形貌分类（规则法）：长宽比/圆度/凸度 → 针片状候选/圆形/棱角状/普通 |
+| `anomaly.py` | 异常检测：>50mm 大块异物、<5mm 噪声、疑似泥团（尺寸+凸度兜底规则，可关闭） |
+| `report.py` | 场景级汇总（数量 vs 质量加权 D 值对照、粒级占比、形貌/异常统计、剔除异常后的正常骨料口径）、文本/JSON 报告、消融对照表 |
+| `app.py` + `__main__.py` | 一键 CLI：`python -m aggregate_screening --grains xxx.csv [--resolution] [--out_dir] [--theta ...] [--gamma ...]` |
+
+工程层输入是 ImageGrains 的 `*_grains.csv`（px 或 mm 单位均可；同时含 mm/px 列时自动推断分辨率）。核心口径：**质量加权 + 剔除异常物后的正常骨料统计**，评分以标准筛分为准。
+
+### 校准流程（待真实筛分数据）
+
+```text
+自采 batch（称重 + 机械筛分 + 拍照）
+  -> ImageGrains 分割/测量 -> 每批 *_grains.csv
+  -> fit_calibration(batches, targets=(D10,D50,D90 真值))
+  -> theta/gamma 参数 -> 写入报告与消融对照
+```
 
 实施顺序与验收口径见 `docs/ai/PLAN.md`；方向性建议见 `docs/insight/`（gitignored，仅供参考）。

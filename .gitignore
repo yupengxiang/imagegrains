@@ -22,3 +22,6 @@ copilot-instructions.md
 *.csv
 
 docs/insight
+
+# 模型权重（大文件，不进版本库；从 Zenodo 下载或本地拷贝）
+models/IG2_full_set_cp_SAM

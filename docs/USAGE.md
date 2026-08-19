@@ -87,7 +87,7 @@ python -m imagegrains \
 | `*_pred.tif` | 分割 mask（每个颗粒一个编号） |
 | `*_composite.png` | 原图 + 分割叠加合成图（目检用） |
 | `*_pred_grains.csv` | **逐颗粒测量明细**（核心中间产物） |
-| `*_pred_grains_re_scaled.csv` | 同上，但 a/b 轴已按分辨率换算为 **mm** |
+| `*_pred_grains_re_scaled.csv` | 同上，但 a/b 轴**同时**保留 px 与 mm 两套列（工程层据此自动推断分辨率） |
 | `a_axis_mm_ellipse_bootstrapping.csv` / `b_axis_mm_ellipse_bootstrapping.csv` | 粒径分布 bootstrap 不确定度 |
 | `GSD_uncertainty/` | 数量分布 D10/D50/D90 及不确定度（官方口径） |
 
@@ -118,7 +118,8 @@ python -m imagegrains \
 ### 4.1 命令（三种输入方式）
 
 ```bash
-# 方式 A（推荐）：直接分析 imagegrains 输出的 CSV（自动推断分辨率）
+# 方式 A（推荐）：直接分析 imagegrains 输出的 CSV
+# *_re_scaled.csv 同时含 px 与 mm 两套轴列，分辨率由 b_mm/b_px（或 a 轴）逐颗粒取中位数自动推断
 python -m aggregate_screening --grains <输出>/*_re_scaled.csv --out_dir <输出>/report
 
 # 方式 B：只有 px 单位 CSV，手动给分辨率
@@ -134,7 +135,7 @@ python -m aggregate_screening --img_dir <图目录> --mask_dir <mask目录> --re
 | --- | --- | --- |
 | `--grains` | 无 | ImageGrains 的 `*_grains.csv` 或 `*_re_scaled.csv`（方式 A/B） |
 | `--img_dir` + `--mask_dir` | 无 | 原图目录 + mask 目录（方式 C） |
-| `--resolution` | 无 | mm/px；px 单位 CSV 必填；CSV 同时含 mm/px 列时可省略（自动按 mm/px 中位数推断） |
+| `--resolution` | 无 | mm/px；px 单位 CSV 必填；`*_re_scaled.csv` 同时含 mm/px 列，自动按 `mm/px` 中位数推断，无需手动给 |
 | `--out_dir` | `./aggregate_report` | 报告输出目录 |
 | `--theta` | `1,0,0` | 等效粒径参数 `θ₁,θ₂,θ₃`（逗号分隔三个数）。默认直接用 b 轴；有校准结果时传入校准值 |
 | `--gamma` | `3.0` | 质量权重指数。`γ=3` 表示按体积加权；颗粒越近球且密度均匀越成立 |
@@ -297,6 +298,19 @@ area(px²) ─×res²─→ 面积(mm²) ─2√(A/π)─→ d_eq(mm)   ← θ�
 当前都是**规则法**，基于 ImageGrains 已输出的几何量（长宽比/圆度/凸度），阈值可配置
 （见 5.3/5.4 节）。形貌是投影形貌（无真实厚度）；泥团当前仅兜底规则（默认关闭），
 真正的泥团识别需要图像 crop 的颜色/纹理分类器（TODO P1）。
+
+### 9.8 工程层"自动推断分辨率"是不是不需要标定了？
+
+不是。自动推断只是把 `_re_scaled.csv` 里 mm 列反推回 mm/px 并省去第 2 步手动传参，
+**正确性完全依赖第 1 步 imagegrains 的 `--resolution`**：
+
+```text
+标尺/ArUco 标定 → --resolution → imagegrains 把 px 换 mm → CSV 里的 mm 列
+                 → 工程层"推断"回同一个 mm/px（其实只是复用第 1 步的标定结果）
+```
+
+第 1 步 `--resolution` 给错，CSV 的 mm 列全错，工程层推断出的也是错值（内部自洽但整体偏）。
+所以分辨率标定必须发生在第 1 步之前，是整个链路的地基（现场 SOP 第 1 步）。
 
 ## 10. 常见问题
 

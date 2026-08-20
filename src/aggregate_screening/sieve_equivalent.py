@@ -1,281 +1,296 @@
 """筛分等效粒径与质量加权粒径分布。
 
-竞赛评分的基准是标准机械筛分结果（质量分布），而 ImageGrains 原生输出的是
-逐颗粒数量分布。两者不能直接对比：
+竞赛评分以标准机械筛分的**质量分布**为准，而 ImageGrains 原生给出的是
+**数量分布**。本模块在两者间搭桥：
 
-- 数量分布给每颗粒相同的权重；质量分布按颗粒质量加权。
-  几何相似且密度接近的颗粒 m ~ d^3，因此质量权重 w = d^gamma（gamma 初始为 3）。
-- 视觉 2D 投影尺寸（b 轴、面积等效直径）与"颗粒能否通过方孔筛"并不等价，
-  需要用一个筛分等效粒径 d_sieve 来桥接：
+1. 筛分等效粒径  d = θ₁·b + θ₂·d_eq + θ₃   （默认 b 轴）
+2. 质量权重      w = d^γ                （默认 γ=3，体积∝尺寸³）
 
-    d_sieve = theta1 * b + theta2 * d_eq + theta3
-
-  默认 theta = (1, 0, 0)，即直接用 b 轴（颗粒通过筛孔主要由较短的尺度控制）。
-
-校准（fit_calibration）需要真实筛分实验数据（自采 batch：称重 + 机械筛分 + 拍照），
-在缺少真值数据时使用默认参数即可产出合理基线。
+新人入口：看 ``weighted_analysis`` → ``weighted_percentiles`` → ``size_fractions``。
+校准 ``fit_calibration`` 仅在有真实筛分数据时使用。
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 from scipy.optimize import differential_evolution
 
-# 标准粗骨料筛孔序列（mm），与比赛范围 5-40 mm 对应
-SIEVES = [5.0, 10.0, 16.0, 20.0, 25.0, 31.5, 40.0]
+from ._columns import (
+    A_AXIS_MM,
+    A_AXIS_PX,
+    AREA_PX,
+    B_AXIS_MM,
+    B_AXIS_PX,
+)
 
-# 默认筛分等效粒径参数：d_sieve = b（b 轴）
-DEFAULT_THETA = (1.0, 0.0, 0.0)
+# ---------------------------------------------------------------------------
+# 常量
+# ---------------------------------------------------------------------------
+SIEVES: list[float] = [5.0, 10.0, 16.0, 20.0, 25.0, 31.5, 40.0]
+DEFAULT_THETA: tuple[float, float, float] = (1.0, 0.0, 0.0)
+DEFAULT_GAMMA: float = 3.0
+FRACTION_LABELS: list[str] = ["5-10", "10-16", "16-20", "20-25", "25-31.5", "31.5-40"]
+assert len(FRACTION_LABELS) == len(SIEVES) - 1, "粒级标签数须为筛孔数-1"
 
-# 默认质量权重指数（几何相似颗粒 m ~ d^3）
-DEFAULT_GAMMA = 3.0
-
-# 粒级区间名称（用于输出）
-FRACTION_LABELS = [
-    "5-10", "10-16", "16-20", "20-25", "25-31.5", "31.5-40",
-]
-
-# ImageGrains grains CSV 中可用的几何列（mm 或 px 视数据而定）
-B_AXIS_COL = "ell: b-axis (mm)"
-A_AXIS_COL = "ell: a-axis (mm)"
-B_AXIS_PX_COL = "ell: b-axis (px)"
-AREA_PX_COL = "area"
-SOLIDITY_COL = "solidity"
-PERIMETER_COL = "perimeter_crofton"
+EPS_D = 1e-9  # 质量权重中对 d 的下限保护
+EPS_DIV = 1e-12  # 圆度/长宽比中对分母的保护
 
 
-def equivalent_diameter(area_px, resolution):
-    """面积等效圆直径 d_eq = 2*sqrt(A/pi)，从像素面积换算到 mm。
+# ---------------------------------------------------------------------------
+# 结构化返回
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class SieveAnalysis:
+    """一次加权分析的完整结果。"""
 
-    area_px 是 ImageGrains grains CSV 中的 area 列（px^2，scale_grains 不缩放它）；
-    resolution 是 mm/px。resolution 为 None（只有 mm 轴列、无尺度信息）时返回 NaN，
-    此时 d_eq 不可用（theta2 非 0 的等效粒径公式会忽略 NaN 颗粒）。
+    d_sieve: np.ndarray  # (n,) 筛分等效粒径 mm
+    w: np.ndarray  # (n,) 质量权重
+    d_eq: np.ndarray  # (n,) 面积等效直径 mm
+    D10: float
+    D50: float
+    D90: float
+    fractions: dict[str, float]  # 含 "<5" / ">40" 边界桶
+
+
+@dataclass(frozen=True)
+class CalibrationResult:
+    theta: tuple[float, float, float]
+    gamma: float
+    success: bool
+    fun: float
+    nit: int
+
+
+# ---------------------------------------------------------------------------
+# 几何换算
+# ---------------------------------------------------------------------------
+def equivalent_diameter(area_px, resolution: float | None) -> np.ndarray:
+    """面积等效直径 d_eq = 2·√(A/π)。
+
+    ``area_px`` 是 CSV 的 ``area`` 列（px²，上游 ``scale_grains`` 不缩放它）。
+    ``resolution`` 为 ``None`` 时返回全 NaN（仅当 θ₂≠0 才需要它）。
     """
     area = np.asarray(area_px, dtype=float)
     if resolution is None:
         return np.full(area.shape, np.nan)
-    area_mm2 = area * resolution ** 2
+    area_mm2 = area * resolution**2
     return 2.0 * np.sqrt(area_mm2 / np.pi)
 
 
-def sieve_diameter(b_mm, d_eq_mm, theta=DEFAULT_THETA):
-    """筛分等效粒径 d_sieve = theta1 * b + theta2 * d_eq + theta3。
-
-    默认 theta=(1,0,0) 时退化为 b 轴。theta 由 fit_calibration 用真实筛分数据校准。
-    d_eq 为 NaN（无分辨率信息）时该颗粒的 d_eq 项按 0 处理（仅当 theta2 非 0 才相关）。
-    """
+def sieve_diameter(
+    b_mm,
+    d_eq_mm,
+    theta: tuple[float, float, float] = DEFAULT_THETA,
+) -> np.ndarray:
+    """筛分等效粒径 d = θ₁·b + θ₂·d_eq + θ₃。"""
     b = np.asarray(b_mm, dtype=float)
     deq = np.asarray(d_eq_mm, dtype=float)
     t1, t2, t3 = theta
+    if t2 != 0 and np.isnan(deq).any():
+        raise ValueError("d_eq 含 NaN 但 theta2≠0：需要提供 resolution 才能计算 d_eq")
     deq = np.nan_to_num(deq, nan=0.0)
     return t1 * b + t2 * deq + t3
 
 
-def mass_weight(d_mm, gamma=DEFAULT_GAMMA):
-    """质量代理权重 w = d^gamma。gamma=3 对应几何相似颗粒 m ~ d^3。
-
-    对 d <= 0 的退化值做下限保护，避免负值幂产生 NaN。
-    """
-    d = np.maximum(np.asarray(d_mm, dtype=float), 1e-9)
-    return d ** gamma
+def mass_weight(d_mm, gamma: float = DEFAULT_GAMMA) -> np.ndarray:
+    """质量权重 w = d^γ，对 d≤0 做下限保护。"""
+    d = np.maximum(np.asarray(d_mm, dtype=float), EPS_D)
+    return d**gamma
 
 
-def weighted_percentiles(d_mm, w, percs=(10, 50, 90)):
-    """质量加权累计分布 F(d) = sum(w_i * I(d_i<=d)) / sum(w_i) 的分位数。
+# ---------------------------------------------------------------------------
+# 加权统计
+# ---------------------------------------------------------------------------
+def weighted_percentiles(d_mm, w, percs: tuple[float, ...] = (10, 50, 90)) -> np.ndarray:
+    """质量加权分位数：F(d)=Σw·I(dᵢ≤d)/Σw 的阶梯逆。
 
-    采用累积分布的阶梯逆（最小的 d 使 F(d) >= p），与"50% 质量通过筛孔"的
-    物理语义一致。返回与 percs 等长的数组；空输入返回 NaN。
+    与"50% 质量通过筛孔"的筛分语义一致。空输入返回全 NaN。
     """
     d = np.asarray(d_mm, dtype=float)
     w = np.asarray(w, dtype=float)
-    percs = np.atleast_1d(np.asarray(percs, dtype=float))
+    percs_arr = np.asarray(percs, dtype=float)
     if d.size == 0:
-        return np.full(percs.shape, np.nan)
+        return np.full(percs_arr.shape, np.nan)
     order = np.argsort(d)
-    d_sorted = d[order]
-    w_sorted = w[order]
-    cdf = np.cumsum(w_sorted)
+    cdf = np.cumsum(w[order])
     cdf = cdf / cdf[-1]
-    frac = percs / 100.0
-    idx = np.searchsorted(cdf, frac, side="left")
-    idx = np.clip(idx, 0, len(d_sorted) - 1)
-    return d_sorted[idx].astype(float)
+    idx = np.searchsorted(cdf, percs_arr / 100.0, side="left")
+    idx = np.clip(idx, 0, len(d) - 1)
+    return d[order][idx].astype(float)
 
 
-def size_fractions(d_mm, w, sieves=SIEVES, labels=FRACTION_LABELS):
-    """按筛孔序列计算各粒级质量占比（%）。
-
-    粒级 [sieves[i], sieves[i+1])；小于最小筛孔的归 '<min'，大于最大筛孔的归 '>max'。
-    返回 pandas Series：labels 顺序的粒级 + 两个边界桶。
-    """
+def size_fractions(
+    d_mm,
+    w,
+    sieves: list[float] = SIEVES,
+    labels: list[str] = FRACTION_LABELS,
+) -> dict[str, float]:
+    """按筛孔序列计算各粒级质量占比（%），含边界桶 ``<min`` / ``>max``。"""
     d = np.asarray(d_mm, dtype=float)
     w = np.asarray(w, dtype=float)
     if d.size == 0:
         out = {lab: 0.0 for lab in labels}
         out[f"<{sieves[0]:g}"] = 0.0
         out[f">{sieves[-1]:g}"] = 0.0
-        return pd.Series(out)
-    total = w.sum()
-    fracs = {}
-    for i in range(len(sieves) - 1):
+        return out
+    total = float(w.sum())
+    out: dict[str, float] = {}
+    for i, lab in enumerate(labels):
         mask = (d >= sieves[i]) & (d < sieves[i + 1])
-        fracs[labels[i]] = 100.0 * w[mask].sum() / total
-    fracs[f"<{sieves[0]:g}"] = 100.0 * w[d < sieves[0]].sum() / total
-    fracs[f">{sieves[-1]:g}"] = 100.0 * w[d >= sieves[-1]].sum() / total
-    return pd.Series(fracs)
+        out[lab] = 100.0 * float(w[mask].sum()) / total
+    out[f"<{sieves[0]:g}"] = 100.0 * float(w[d < sieves[0]].sum()) / total
+    out[f">{sieves[-1]:g}"] = 100.0 * float(w[d >= sieves[-1]].sum()) / total
+    return out
 
 
 def weighted_analysis(
     b_mm,
     area_px,
-    resolution,
-    theta=DEFAULT_THETA,
-    gamma=DEFAULT_GAMMA,
-    sieves=SIEVES,
-    percs=(10, 50, 90),
-):
-    """从逐颗粒几何数据一次算齐：等效粒径、质量权重、D10/D50/D90、粒级占比。
-
-    参数
-    ----
-    b_mm : 每颗粒 b 轴（mm）
-    area_px : 每颗粒面积（px^2）
-    resolution : mm/px
-    theta, gamma : 等效粒径与质量权重参数
-
-    返回
-    ----
-    dict: d_sieve, w, D10/D50/D90（dict）, fractions（Series）
-    """
+    resolution: float | None,
+    theta: tuple[float, float, float] = DEFAULT_THETA,
+    gamma: float = DEFAULT_GAMMA,
+    sieves: list[float] = SIEVES,
+    percs: tuple[float, ...] = (10, 50, 90),
+) -> SieveAnalysis:
+    """从逐颗粒几何一次算齐等效粒径、权重、D值与粒级占比。"""
     b = np.asarray(b_mm, dtype=float)
     area = np.asarray(area_px, dtype=float)
     deq = equivalent_diameter(area, resolution)
     d = sieve_diameter(b, deq, theta=theta)
     w = mass_weight(d, gamma=gamma)
-    d_perc = weighted_percentiles(d, w, percs=percs)
-    d10, d50, d90 = d_perc
+    d10, d50, d90 = weighted_percentiles(d, w, percs=percs)
     fracs = size_fractions(d, w, sieves=sieves)
-    return {
-        "d_sieve": d,
-        "w": w,
-        "d_eq": deq,
-        "D10": d10,
-        "D50": d50,
-        "D90": d90,
-        "fractions": fracs,
-    }
+    return SieveAnalysis(d_sieve=d, w=w, d_eq=deq, D10=float(d10), D50=float(d50), D90=float(d90), fractions=fracs)
 
 
-def _calibration_loss(params, batches, targets, percs=(10, 50, 90), w_targets=None):
-    """校准目标函数：预测 D10/D50/D90 与真值的加权相对误差。
-
-    batches : list of (b_mm 数组, area_px 数组, resolution)
-    targets : list of (d10, d50, d90) 真值（来自机械筛分）
-    w_targets : 可选，粒级占比真值的权重；None 时只优化 D 值
-    """
-    theta = (params[0], params[1], params[2])
-    gamma = params[3]
-    losses = []
+# ---------------------------------------------------------------------------
+# 校准
+# ---------------------------------------------------------------------------
+def _calibration_loss(
+    params: np.ndarray,
+    batches: list[tuple[np.ndarray, np.ndarray, float | None]],
+    targets: list[tuple[float, float, float]],
+    percs: tuple[float, ...] = (10, 50, 90),
+) -> float:
+    theta = (float(params[0]), float(params[1]), float(params[2]))
+    gamma = float(params[3])
+    weight = np.array([0.25, 0.5, 0.25])  # D50 权重最高
+    losses: list[np.ndarray] = []
     for (b, area, res), (d10_t, d50_t, d90_t) in zip(batches, targets):
         ana = weighted_analysis(b, area, res, theta=theta, gamma=gamma, percs=percs)
-        pred = np.array([ana["D10"], ana["D50"], ana["D90"]])
+        pred = np.array([ana.D10, ana.D50, ana.D90])
         true = np.array([d10_t, d50_t, d90_t])
         rel = (pred - true) / np.maximum(true, 1e-6)
-        # D50 权重最高（评分核心）
-        losses.append((rel * np.array([0.25, 0.5, 0.25])) ** 2)
+        losses.append(weight * rel**2)
     return float(np.mean(np.concatenate(losses)))
 
 
 def fit_calibration(
     batches,
-    targets,
-    theta0=DEFAULT_THETA,
-    gamma0=DEFAULT_GAMMA,
-    bounds=((0.0, 3.0), (0.0, 3.0), (-20.0, 20.0), (1.0, 5.0)),
-):
-    """用真实筛分数据拟合 (theta1, theta2, theta3, gamma)。
+    targets: list[tuple[float, float, float]],
+    theta0: tuple[float, float, float] = DEFAULT_THETA,
+    gamma0: float = DEFAULT_GAMMA,
+    bounds: tuple[tuple[float, float], ...] = ((0.0, 3.0), (0.0, 3.0), (-20.0, 20.0), (1.0, 5.0)),
+) -> CalibrationResult:
+    """用真实筛分数据拟合 (θ₁,θ₂,θ₃,γ)。
 
-    参数
-    ----
-    batches : list of dict/tuple，每项提供 b_mm、area_px、resolution
-    targets : list of (d10, d50, d90) 真值（机械筛分，mm）
-    theta0, gamma0 : 初始参数
-    bounds : 参数边界 (theta1, theta2, theta3, gamma)
-
-    返回
-    ----
-    dict: theta, gamma, success, fun（损失值）
+    ``batches`` 每项为 ``{"b_mm","area_px","resolution"}`` 或 ``(b_mm, area_px, resolution)``。
+    ``targets`` 为各批次机械筛分的 (D10,D50,D90) 真值。
+    累积分布为阶梯函数，用无梯度差分进化优化。
     """
-    bat_list = []
+    bat_list: list[tuple[np.ndarray, np.ndarray, float | None]] = []
     for bt in batches:
         if isinstance(bt, dict):
-            bat_list.append((bt["b_mm"], bt["area_px"], bt["resolution"]))
+            bat_list.append((np.asarray(bt["b_mm"]), np.asarray(bt["area_px"]), bt["resolution"]))
         else:
-            bat_list.append(bt)
-    x0 = [theta0[0], theta0[1], theta0[2], gamma0]
-    # 累积分布是阶梯函数，对梯度优化器不平滑，用无梯度差分进化
+            b, a, r = bt
+            bat_list.append((np.asarray(b), np.asarray(a), r))
+    _ = [theta0[0], theta0[1], theta0[2], gamma0]  # 保留签名参数，优化由 bounds 驱动
     res = differential_evolution(
-        _calibration_loss, bounds, args=(bat_list, targets), seed=0,
-        maxiter=1000, tol=1e-8, atol=1e-10,
+        _calibration_loss, bounds, args=(bat_list, targets), seed=0, maxiter=1000, tol=1e-8, atol=1e-10
     )
-    theta = (res.x[0], res.x[1], res.x[2])
+    theta = (float(res.x[0]), float(res.x[1]), float(res.x[2]))
     success = bool(res.success) or float(res.fun) < 1e-8
-    return {
-        "theta": theta,
-        "gamma": float(res.x[3]),
-        "success": success,
-        "fun": float(res.fun),
-        "nit": int(res.nit),
-    }
+    return CalibrationResult(theta=theta, gamma=float(res.x[3]), success=success, fun=float(res.fun), nit=int(res.nit))
 
 
-def load_grains_df(grains_csv, resolution=None):
-    """加载 ImageGrains 的 *_grains.csv（或 *_re_scaled.csv），返回标准化 DataFrame。
+# ---------------------------------------------------------------------------
+# CSV 标准化（显式、可测试）
+# ---------------------------------------------------------------------------
+def infer_resolution(df: pd.DataFrame) -> float | None:
+    """从同时含 mm/px 列的 DataFrame 推断 mm/px（b 轴中位数），否则 None。"""
+    if B_AXIS_MM in df.columns and B_AXIS_PX in df.columns:
+        valid = df[B_AXIS_PX] != 0
+        if valid.any():
+            ratios = df.loc[valid, B_AXIS_MM] / df.loc[valid, B_AXIS_PX]
+            ratios = ratios.replace([np.inf, -np.inf], np.nan).dropna()
+            if len(ratios) > 0:
+                return float(ratios.median())
+    return None
 
-    - 输入可以是 CSV 路径或已读入的 pandas DataFrame；
-    - 若含 mm 列，直接使用；若只有 px 列，用 resolution（mm/px）换算；
-    - 若同时含 mm 与 px 列且未提供 resolution，自动按 mm/px 中位数推断；
-    - 输出统一含：b_mm、a_mm、area_px、d_eq_mm 等列；
-    - 无法得到尺度时（只有 px 列且无 resolution）报错；只有 mm 列时 d_eq_mm 为 NaN。
+
+def normalize_grains(df: pd.DataFrame, resolution: float | None = None) -> pd.DataFrame:
+    """将任意形态的 grains DataFrame 标准化为含 ``b_mm/a_mm/area_px/d_eq_mm`` 的表。
+
+    - 已含 ``b_mm/a_mm`` → 直接复用；
+    - 含 ``ell: b/a-axis (mm)`` → 直接取；
+    - 仅含 ``(px)`` 列 → 需 ``resolution`` 换算，否则抛错；
+    - 若 ``resolution`` 为 ``None`` 且同时有 mm/px 列，自动推断。
+    始终新增 ``area_px`` 与 ``d_eq_mm``，不使用 ``df.attrs`` 隐式通道。
     """
-    if isinstance(grains_csv, (str, Path)):
-        df = pd.read_csv(grains_csv)
-    else:
-        df = grains_csv.copy()
+    out = df.copy()
+    # 解析分辨率
+    if resolution is None:
+        inferred = infer_resolution(out)
+        if inferred is not None:
+            resolution = inferred
 
-    has_mm = B_AXIS_COL in df.columns and A_AXIS_COL in df.columns
-    has_px = B_AXIS_PX_COL in df.columns and A_AXIS_COL.replace("(mm)", "(px)") in df.columns
+    has_mm = B_AXIS_MM in out.columns and A_AXIS_MM in out.columns
+    has_px = B_AXIS_PX in out.columns and A_AXIS_PX in out.columns
+    has_norm = "b_mm" in out.columns and "a_mm" in out.columns
 
-    if resolution is None and has_mm and has_px:
-        ratio = df[B_AXIS_COL] / df[B_AXIS_PX_COL].replace(0, np.nan)
-        ratio = ratio.replace([np.inf, -np.inf], np.nan).dropna()
-        if len(ratio) > 0:
-            resolution = float(np.median(ratio.to_numpy()))
-
-    if "b_mm" in df.columns and "a_mm" in df.columns:
-        b_mm = df["b_mm"].to_numpy(dtype=float)
-        a_mm = df["a_mm"].to_numpy(dtype=float)
+    if has_norm:
+        b_mm = out["b_mm"].to_numpy(dtype=float)
+        a_mm = out["a_mm"].to_numpy(dtype=float)
     elif has_mm:
-        b_mm = df[B_AXIS_COL].to_numpy(dtype=float)
-        a_mm = df[A_AXIS_COL].to_numpy(dtype=float)
+        b_mm = out[B_AXIS_MM].to_numpy(dtype=float)
+        a_mm = out[A_AXIS_MM].to_numpy(dtype=float)
     elif has_px:
         if resolution is None:
-            raise ValueError(
-                f"{grains_csv} 只有像素列，需要提供 resolution（mm/px）"
-            )
-        b_mm = df[B_AXIS_PX_COL].to_numpy(dtype=float) * resolution
-        a_mm = df[A_AXIS_COL.replace("(mm)", "(px)")].to_numpy(dtype=float) * resolution
+            raise ValueError("该 DataFrame 只有像素列，需要提供 resolution（mm/px）")
+        b_mm = out[B_AXIS_PX].to_numpy(dtype=float) * resolution
+        a_mm = out[A_AXIS_PX].to_numpy(dtype=float) * resolution
     else:
-        raise ValueError(f"无法识别粒径列：{list(df.columns)}")
-    area_px = df[AREA_PX_COL].to_numpy(dtype=float)
-    out = df.copy()
+        raise ValueError(f"无法识别粒径列：{list(out.columns)}")
+
+    if AREA_PX not in out.columns:
+        raise ValueError(f"缺少面积列 {AREA_PX!r}：{list(out.columns)}")
+    area_px = out[AREA_PX].to_numpy(dtype=float)
+
     out["b_mm"] = b_mm
     out["a_mm"] = a_mm
     out["area_px"] = area_px
     out["d_eq_mm"] = equivalent_diameter(area_px, resolution)
-    out.attrs["resolution"] = resolution
+    # 显式记录分辨率（列而非 attrs，便于追溯）
+    out["__resolution_mm_per_px"] = resolution
     return out
+
+
+def load_grains_csv(path: str | Path, resolution: float | None = None) -> pd.DataFrame:
+    """从 CSV 路径加载并标准化。``resolution`` 语义同 ``normalize_grains``。"""
+    df = pd.read_csv(path)
+    return normalize_grains(df, resolution=resolution)
+
+
+# 兼容旧入口（显式提示迁移）
+def load_grains_df(grains_csv, resolution: float | None = None) -> pd.DataFrame:
+    """兼容旧名：等价于 ``normalize_grains(DataFrame)`` 或 ``load_grains_csv(path)``。"""
+    if isinstance(grains_csv, (str, Path)):
+        return load_grains_csv(grains_csv, resolution=resolution)
+    if isinstance(grains_csv, pd.DataFrame):
+        return normalize_grains(grains_csv, resolution=resolution)
+    raise TypeError(f"grains_csv 应为路径或 DataFrame，得到 {type(grains_csv)}")

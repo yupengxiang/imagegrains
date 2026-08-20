@@ -21,15 +21,15 @@
 
 ## 数据与文件约定
 
-这些是上游代码里已经硬编码的约定，新增/修改时保持一致，不要擅自改名：
+这些是上游硬编码约定，保持一致，不要擅自改名：
 
-- 图像与 mask 同名配对：mask 文件名为图像名加 `_mask` 后缀，格式默认 `tif`（`data_loader.find_data`）。
-- 逐颗粒测量 CSV：文件名模式 `*_grains.csv`；粒径列默认名为 `ell: b-axis (px)`（有尺度时为 `ell: b-axis (mm)`），由 `read_grains` 读取。
-- GSD 汇总：`*_gsd.csv`；不确定度文件：`*_perc_uncert.txt`。
-- `filters` 字典形状：`{'edge': [True, value], 'px_cutoff': [True, value]}`，第一个元素是开关。
-- 输出目录：函数统一接受 `tar_dir=''`（空串表示与输入同目录）。
-- 尺度转换：`--resolution` 接受单个 mm/px 数值或按图像列出分辨率的 CSV；`grainsizing.scale_grains` / `calculate_camera_res` 负责换算。
-- 不要改动 `demo_data/`、`models/` 中的预训练权重与演示数据。
+- 图像与 mask 同名配对：`_mask.tif`（`data_loader.find_data`）。
+- 逐颗粒 CSV：`*_grains.csv`；粒径列 `ell: b-axis (px/mm)` 定义见 `src/aggregate_screening/_columns.py`（单一来源），旧代码由 `read_grains` 读取。
+- GSD：`*_gsd.csv`；不确定度：`*_perc_uncert.txt`。
+- `filters = {'edge': [bool,val], 'px_cutoff': [bool,val]}`。
+- 输出目录：`tar_dir=''` 表与输入同目录。
+- 尺度：`--resolution` mm/px 或 CSV；竞赛层 `infer_resolution`/`normalize_grains` 显式化（`load_grains_df` 为兼容旧名）。
+- 不改动 `demo_data/`/`models/` 权重与演示数据。
 
 ## CLI 约定
 

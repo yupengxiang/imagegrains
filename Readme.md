@@ -1,5 +1,7 @@
 # ImageGrains  <img src="https://github.com/dmair1989/ImageGrains/blob/main/illustrations/logo_2.png?raw=true" width="100" title="logo" alt="logo" align="left">
 
+> **竞赛分支**：本仓库为 ImageGrains 2.0 的竞赛 fork，服务"混凝土骨料颗粒智能筛分比拼"（自然堆积赛道）。**新人请先读 [`docs/USAGE.md`](docs/USAGE.md)（30 分钟一键流程）与 [`docs/task.md`](docs/task.md)（赛题原文），上游通用文档见下方。**
+
 ![build](https://github.com/dmair1989/imagegrains/actions/workflows/ci.yml/badge.svg)
 [![PyPI version](https://badge.fury.io/py/imagegrains.svg)](https://badge.fury.io/py/imagegrains)
 ![PyPI - Wheel](https://img.shields.io/pypi/wheel/imagegrains)

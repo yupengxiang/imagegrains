@@ -2,26 +2,27 @@
 
 TODO 项不是自动的实施许可；实施前需用户或当前任务显式选择。
 
-## 已落地（2026-08-19）
+## 已落地（2026-08）
 
-- [x] 竞赛版使用手册 `docs/USAGE.md`（环境/模型/两阶段命令/参数/输入输出/结果解读/校准/SOP）。
-- [x] 模型 `models/IG2_full_set_cp_SAM`（1.2GB，Zenodo 完整版）放入项目 `models/` 并加入 `.gitignore`（不进版本库）。
+- [x] 竞赛工程层 MVP + 代码重构 `9435f9b`（`_columns`/`SieveAnalysis`/`SceneSummary`，27 passed）
+- [x] 使用手册 `docs/USAGE.md` 瘦身至 ~270 行并对齐新 API（`load_grains_csv`/`infer_resolution`/`CalibrationResult`）
+- [x] `docs/architecture.md`/`data-flow.md` 四步链 + `_columns`/`scipy`，`Readme` 竞赛横幅
+- [x] `docs/ai/*` 收束过时断言，`docs/ai` 明确仅面向 agent
+- [x] 模型 `models/IG2_full_set_cp_SAM`（Zenodo 1.2 GB，gitignored）
 
 ## 依赖真实数据/硬件（P0）
 
-- [ ] 采集骨料图像 + 筛分实验 batch（称重 + 机械筛分 5/10/16/20/25/31.5/40mm + 拍照），
-      用 `fit_calibration` 校准 θ/γ（当前为默认经验基线，评分误差的主要来源）。
-- [ ] 用真实骨料图像评估预训练模型（`~/imagegrains/models/IG2_full_set_cp_SAM`）的
-      分割质量（漏分/粘连/误检），决定是否微调。
-- [ ] 实现尺度标定：ArUco/标尺检测 + homography 透视校正，替代固定 resolution CSV。
+- [ ] 采批料筛分实验校准 θ/γ（当前经验基线，评分误差主因）
+- [ ] 评估真实分割质量（漏分/粘连/误检），定是否微调
+- [ ] ArUco/标尺标定 + homography 透视校正
 
 ## P1
 
-- [ ] 泥团/非骨料分类器：当前为尺寸+凸度兜底规则；有图像 crop 后接入颜色/纹理分类。
-- [ ] 形貌阈值用真实骨料数据标定（`morphology.DEFAULT_THRESHOLDS`）。
-- [ ] 一键图形界面/自动 QC（Streamlit 或等价物），适配现场 30 分钟约束。
+- [ ] 泥团分类器（颜色/纹理，当前尺寸+凸度兜底）
+- [ ] 形貌阈值重标定（`MorphThresholds`）
+- [ ] 一键图形界面/自动 QC（现场 30 分钟）
 
 ## 工程卫生
 
-- [ ] 补 `tests/test_imagegrains.py` 真实用例（当前占位）。
-- [ ] 骨料分割质量评估脚本（批量跑模型 → 目检/指标统计）。
+- [ ] 补 `tests/test_imagegrains.py` 真实用例
+- [ ] 分割质量评估脚本

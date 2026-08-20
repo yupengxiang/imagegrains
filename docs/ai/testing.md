@@ -38,7 +38,7 @@ pytest tests/ -v
 pytest tests/test_imagegrains.py -v
 ```
 
-当前 `tests/test_imagegrains.py` 只有一个占位用例，收集应该为 1 passed；这是正常状态，不代表代码没有价值。
+`tests/test_imagegrains.py` 为占位；竞赛层测试为 `test_sieve_equivalent|morphology|anomaly|report`（27 passed，合成数据，无模型依赖）。
 
 ## 导入与安装自检
 
@@ -62,13 +62,14 @@ python -m imagegrains --help
 
 ## 单元测试
 
-新增或修改 `src/imagegrains/` 下函数时，先在 `tests/` 补针对性的 pytest 用例，再跑：
+新增或修改 `src/` 下函数时，先在 `tests/` 补 pytest 用例，再跑：
 
 ```bash
-pytest tests/test_imagegrains.py -v
+pytest tests/ -v
+# 竞赛层无需模型：pytest tests/test_sieve_equivalent.py -v 等
 ```
 
-测试应使用合成的 numpy 图像/掩膜或 `demo_data/`，避免引入模型推理依赖。
+测试用合成 numpy 图像/掩膜或 `demo_data/`，不依赖模型推理。
 
 ## Notebook 改动
 

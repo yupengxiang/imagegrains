@@ -1,49 +1,39 @@
 # 架构决策
 
-本文件记录稳定的项目决策，未来 agent 应保持这些决策，除非任务明确要求重新审视。这里只描述已反映在当前代码/文档中的决策，不记录推测性计划。
+本文件记录已反映在代码/文档中的稳定决策，未来 agent 应保持，除非任务明确要求重审。
 
-## 仓库定位：竞赛 fork，而不是上游镜像
+## 仓库定位：竞赛 fork
 
-决策：本仓库是 ImageGrains 2.0 的分支，服务于"混凝土骨料颗粒智能筛分比拼"（`docs/task.md`），选择**自然堆积赛道**。上游代码作为基线保留，竞赛工程能力在其上增量开发。
+本仓库是 ImageGrains 2.0 分支，服务"混凝土骨料颗粒智能筛分比拼"（自然堆积赛道）。上游保持原样，竞赛能力增量开发。
 
-兼容性影响：
+影响：不改 `src/imagegrains/` 公开签名/CLI/输出格式；新能力放独立子包；不设计传送带。
 
-- 不修改 `src/imagegrains/` 的公开函数签名、CLI 参数与输出文件格式；上游升级时可以干净地合并。
-- 新能力（尺度标定、筛分等效粒径、形貌/异常分类、报告）放在独立模块/子包，不塞进现有模块。
-- 不设计传送带（实时视频、跟踪去重）能力，除非赛道选择变更。
+## 评分基准：质量加权优先
 
-## 评分基准是标准筛分：质量加权分布优先
-
-决策：竞赛评分以标准筛分结果为准。视觉系统得到的逐颗粒几何数据必须先转换为**质量加权**粒径分布（例如按 `d^γ` 权重），再计算 D10/D50/D90 与级配曲线；不把逐颗粒数量分布直接当作筛分结果。
-
-兼容性影响：
-
-- 任何"粒径分布/Dxx"输出都必须说明统计口径（数量/面积/质量加权）。
-- `ImageGrains` 原生的 number-based GSD 保留为中间产物与对照，不作为最终交付口径。
-- 筛分等效模型的具体参数（`d_i` 的构造、`γ`）以自采筛分实验数据校准为准，属于待开发内容，尚未落地。
+以标准筛分（质量分布）为准，视觉几何需经 `d=θ₁b+θ₂d_eq+θ₃` + `w=d^γ` 转为质量加权 D10/50/90 与级配；数量口径仅作对照。`_columns.py` 为列名单一来源。
 
 ## 数据与文件契约
 
-决策：沿用上游的数据与文件约定（详见 `docs/ai/coding-style.md` 与 `docs/data-flow.md`）：
-
-- 图像与 mask 同名配对，mask 后缀 `_mask`，格式 tif；
-- 逐颗粒测量 CSV 为 `*_grains.csv`，粒径列 `ell: b-axis (px)` / `(mm)`；
-- GSD 汇总 `*_gsd.csv`，不确定度 `*_perc_uncert.txt`；
-- 尺度经 `--resolution`（mm/px 或按图像 CSV）或相机参数换算。
-
-兼容性影响：
-
-- 不擅自改名这些列名/文件名模式，否则会破坏 `data_loader.read_grains` 等读取路径与既有结果文件。
+沿用上游约定（`coding-style.md`/`data-flow.md`）：图像-mask 同名 `_mask.tif`；逐颗粒 `*_grains.csv`（`ell: b-axis` 列）；GSD `*_gsd.csv`；尺度经 `--resolution` 或 `infer_resolution`。擅自改名会破坏读取路径。
 
 ## 依赖边界
 
-决策：cellpose ≥ 4.0.1（Cellpose-SAM）是分割主干，`pip install -e .[test]` 是标准安装路径。不引入新的重型依赖（新训练框架、实时推理框架等），除非明确确认。
+cellpose ≥4.0.1 + PyTorch 为重型计算；`pip install -e .[test]` 为标准安装；scipy 用于校准。不引新重型依赖。
 
-## 未决事项
+## 已落地（原未决，现决策）
 
-以下方向来自 `docs/insight/` 的 GPT 建议，**尚未在代码中落地**，属于计划而非决策；实施前以 `docs/ai/PLAN.md` 和用户确认为准：
+- 筛分等效粒径 `SieveAnalysis`（`d=θ₁b+θ₂d_eq+θ₃`，默认 b 轴）与 `w=d^γ`（γ=3）及 `CalibrationResult`（差分进化）—— 已实现，参数以自采筛分数据校准为准；
+- 形貌 `MorphThresholds` 规则法与异常 `MUD_BAND/FOREIGN_MIN` — 已实现，阈值需真实数据重标定；
+- 报告 `SceneSummary`/`NormalOnly` 与一键 CLI `python -m aggregate_screening` — 已实现，`scene_summary` 返回 `(summary,df_final)` 单一流水线。
 
-- 相机标定（ArUco/标尺、homography 透视校正）模块；
-- 筛分等效粒径模型（`d_i = θ₁bᵢ + θ₂d_eq,ᵢ + θ₃`）与质量权重（`wᵢ = dᵢ^γ`）的校准流程；
-- 形貌分类（针片状/圆形/棱角状，先规则后分类器）与异常检测（>50 mm、泥团）；
-- 一键式本地应用/报告界面（Streamlit 等）。
+## Code Reorg 2026-08（9435f9b）
+
+- 列常量集中 `_columns.py`；`load_grains_csv`/`infer_resolution`/`normalize_grains` 显式化，删 `df.attrs` 隐式通道；
+- `SieveAnalysis`/`SceneSummary` dataclass 替代裸 dict，`size_fractions` 返回 `dict`；
+- 显式优先级 `angular>round>needle`，`anomaly` 统一命名与长度校验；`app` 懒加载绘图、去 CSV 回读、库函数抛 `ValueError`。
+
+## 未决
+
+- ArUco/标尺标定 + homography 透视校正；
+- 泥团颜色/纹理分类器；
+- 一键图形界面（Streamlit 等）。

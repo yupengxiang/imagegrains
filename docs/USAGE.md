@@ -54,9 +54,9 @@ python -m imagegrains --img_dir <图目录> --model_dir models/ --out_dir <输�
 | `--out_dir` | 输出目录 | 缺省写到输入目录，新数据前请清理 |
 | `--gpu` | GPU | `True` 快；`False` 慢 |
 | `--resolution` | **mm/px 关键参数** | 决定所有 mm 结果；无标尺时用场景已知值（demo 0.39） |
-| `--diameter` | 先验直径 px | 供 Cellpose 参考，一般不改 |
-| `--min_size` | 最小面积 px | 滤小噪声 |
-| `--skip_segmentation` | 跳过分割 | 已有 `*_mask.tif` 时 |
+| `--diameter` | 目标平均粒径 px（默认 `None` 自动估计） | Cellpose 缩放提示：会把图像缩放到该直径≈30 px 再分割；`物理粒径 mm / 分辨率 mm/px` 估算（如 20 mm/0.39≈51 px），一般不改，目检粘连/破碎再 ±10 px 微调 |
+| `--min_size` | 最小对象面积 px²（默认 `0` 不滤） | 面积<该值的 mask 丢弃（非正方形边长，如 `15`≈3×5 px 的视为噪声），一般不改 |
+| `--skip_segmentation` | 跳过分割 | 已有 `*_mask.tif` 时（GT 真值或上次预测）复用直接测粒径 |
 | `--skip_grainsize` | 跳过测量 | 仅分割时 |
 | `--unc_method/--n/--scale_err/--length_err` | 不确定度 | bootstrap 方法/次数/尺度/长度误差，默认即可 |
 | `--save_composites` | 叠加图 | 目检分割（默认 True） |

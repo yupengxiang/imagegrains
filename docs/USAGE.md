@@ -228,7 +228,70 @@ tbl = report.ablation_table(df, 0.39, gammas=[1,2,3])
 
 ---
 
-## 10. 导航
+## 10. 傻瓜式全流程（以仓库已提交的 `demo_data/samples/agg_001.jpg` 为例）
+
+> 选样：全面检查 30 张（`agg_001–030` 均 `3024×4032`，`D50 质量 14.6–27.5 mm` 中位 23.6）后挑 **3 张代表进库（`samples/` 21 MB）**：`agg_029` 细粒主导（`5–10` 32.7%）、`agg_001` 中值（`25–31.5` 34.2%）、`agg_005` 粗粒（`27.5`），覆盖连续级配；`031–036` 尺截断未进库。本节以 `agg_001` 演示，另 2 张同参复跑。
+
+```bash
+# 0. 环境与模型（一次）
+conda activate imagegrains
+# 模型 1.2 GB 已在 .gitignore，需手动：curl -sL --retry 5 -o models/IG2_full_set_cp_SAM https://zenodo.org/records/15728186/files/IG2_full_set_cp_SAM
+
+# 1. 分割+测量（单张约 17s GPU + 9s 测量；* 支撑任务 1）
+python -m imagegrains --img_dir demo_data/samples --model_dir models --out_dir /tmp/demo --resolution 0.208 --gpu True
+# 输入：demo_data/samples/agg_001.jpg（+另 2 张）
+# 输出：/tmp/demo/agg_001_IG2_full_set_cp_SAM_pred.tif（mask 1…1924，任务1精细识别）
+#       /tmp/demo/agg_001..._composite.png（目检粘连）
+#       /tmp/demo/agg_001..._pred_grains.csv（20 列 px，任务2前半）
+#       /tmp/demo/agg_001..._pred_grains_re_scaled.csv（追加 a/b mm 2 列，rescale 仅 b/a×0.208）
+
+# 2. 筛分报告（* 支撑任务 2/3/4，约 1s）
+python -m aggregate_screening --grains /tmp/demo/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled.csv --out_dir /tmp/demo/report
+# 也可批量：for f in /tmp/demo/*re_scaled.csv; do python -m aggregate_screening --grains $f --out_dir /tmp/demo/report; done
+
+# 3. 看结果
+cat /tmp/demo/report/agg_001*report.txt
+# 颗粒数 1924 分辨率 0.208 mm/px
+# D10 数量3.1/质量10.6  D50 数量6.0/质量23.5  D90 数量17.3/质量30.6
+# 剔除异常后（1193 颗正常）：D10 11.1 D50 23.6 D90 30.6  ← 提交口径（任务2）
+# 粒级 25-31.5 34.2% 为主（右柱即筛分质量直方图）
+# 形貌：针片 16.3% 圆 8.0% 棱角 16.4% 普通 59.3%（任务3，shape_class 列）
+# 异常：<5 噪声 731 颗 38%  >50 0 颗（任务4，大块靠粒径；泥团当前仅 40-50 & solidity 几何兜底，需新数据训 crop 分类器）
+ls /tmp/demo/report/
+# agg_001..._summary.json（结构化，percentiles_mass_weighted/mass_fractions）
+# agg_001..._particles_annotated.csv（逐粒 b_mm/a_mm/d_eq_mm/shape_*/anomaly_*）
+# agg_001..._gsd_comparison.png（左橙质量累计 vs 蓝数量，右柱质量占比，对标筛分）
+```
+
+`GSD_uncertainty/*_full_uncertainty.csv` 为数量口径 bootstrap 95% CI（`lower/median/upper/value`），答辩展示用，非评分。
+
+## 11. 命名与列释疑（新人常问）
+
+- `area` vs `area_convex`：前者颗粒真面积，后者最小凸包面积，`convexity=area/area_convex` 近 1 越凸；泥团判据用 `solidity<0.85` 即凹陷多疑似泥团。
+- `IR=4πA/P²`：`A=area`，`P=perimeter_crofton` 周长平方（非面积），圆为 1；`IRn=IR/IRt`（`IRt` 为同 `a/b` 椭圆理论值，Ramanujan 周长 `grainsizing.py:271`）。
+- `ell: a/b-axis (mm)` vs `b_mm/a_mm`：同值，后者为 `normalize_grains` 标准化列（`_columns.py` 单一来源），`area_px/d_eq_mm/__resolution` 为显式追溯列。
+- `b 轴方位角` 冗余：`b⊥a`，`b_az = orientation+90°`，因 `orientation` 为弧度、`b_az` 为 `°` 且地质惯用 `b` 轴，列出免换算。
+
+## 12. 任务书→代码→输出映射
+
+| 赛题 `docs/task.md` | 代码过程 | 关键输出 | 判定 |
+| --- | --- | --- | --- |
+| **1 精细识别** 分割+粘连分离 | `segmentation_helper.predict_folder`（Cellpose-SAM） | `demo_data/test_out/*_pred.tif`（实例 mask，`1…N`）、`*_composite.png` 目检 | 颗粒与背景/颗粒间粘连分离 |
+| **2 粒径分析** 直径+分布 `D10/50/90` | `grainsizing.batch_grainsize` + `sieve_equivalent.normalize_grains → SieveAnalysis(d=θb+θd_eq, w=d³)` | `*_pred_grains.csv`（`b/a px`）→ `*_re_scaled.csv`（`b/a mm` 2 列追加）→ `reports/*summary.json:percentiles_mass_weighted/mass_fractions`、`_gsd_comparison.png:1` 右柱/左橙线 | 数量 vs 质量双口径，质量对标筛分 |
+| **3 形状分类** 针片/圆/棱角 | `morphology.classify_dataset`（`MorphThresholds`） | `reports/*_particles_annotated.csv:shape_class/label`、`summary.json:shape` | 投影形貌，阈值可标定 |
+| **4 异常** >50 异物/泥团 | `anomaly.classify_anomalies`（`FOREIGN_MIN>50`, `MUD_BAND 40–50 & solidity`） | 同表 `anomaly_class/label`、`summary.json:anomalies`；大块靠粒径，泥团当前仅几何兜底 | 泥团需 `crop` 颜色/纹理分类器（需新数据，`TODO P1`） |
+
+`GSD_uncertainty/*_full_uncertainty.csv:1` 的 8 列（`a/b × lower/median/upper/value`）为数量口径 bootstrap 区间，答辩展示用，非评分。
+
+## 13. 数据与 Git 管理
+
+- **GitHub 限制**：单文件硬上限 **100 MB**（`git push` 直接拒），仓库软建议 **1 GB**、硬上限约 **5 GB**，超大文件需 `git lfs`（单文件最高 5 GB，但 LFS 配额/带宽另计）。`demo_data/test` 236 MB 虽单文件未超 100 MB，但整批 `+test_out 302 MB` 推送会拖慢克隆且超软建议。
+- `demo_data/K1` 2 张（793 KB）属历史小样已跟踪（`.gitignore:20` 的 `*.jpg` 对已跟踪不生效）；全量 `test` 36 张被 `*.jpg/*.tif/*.csv/*.png` 忽略（`git check-ignore -v demo_data/test/agg_001.jpg → *.jpg`），**不可 `git add`**。
+- 约定：`test`/`test_out` 保持 `gitignored` 本地，**仅提交 3 张代表 `demo_data/samples/`（`agg_001/005/029` 21 MB，`!demo_data/samples/*.jpg` 回补）** 供上手；全量走网盘/LFS。
+
+---
+
+## 14. 导航
 
 - 赛题原文 `docs/task.md`；架构 `docs/architecture.md`；数据流 `docs/data-flow.md`
-- 源码 `src/aggregate_screening/`（`sieve_equivalent/morphology/anomaly/report/app/_columns`）；测试 `tests/test_*`；`pytest tests/`
+- 源码 `src/aggregate_screening/`（`sieve_equivalent/morphology/anomaly/report/app/_columns/scale`）；测试 `tests/test_*`；`pytest tests/`

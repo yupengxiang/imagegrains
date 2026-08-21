@@ -25,3 +25,10 @@ docs/insight
 
 # 模型权重（大文件，不进版本库；从 Zenodo 下载或本地拷贝）
 models/IG2_full_set_cp_SAM
+
+# 预测输出
+demo_data/test_out
+
+# 竞赛小样（代表性 3 张，~21 MB，可进库；*.jpg 全局忽略，此处回补）
+!demo_data/samples/
+!demo_data/samples/*.jpg

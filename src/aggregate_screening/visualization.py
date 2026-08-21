@@ -172,11 +172,11 @@ def plot_shape_gallery(
     resolution: float | None,
     stem: str,
 ):
-    """任务3：针片/圆/棱角/普通 各一张。"""
+    """任务3：针片/圆/棱角/普通 各一张（英文标题避 DejaVu 缺中文字形）。"""
     out_dir = Path(out_dir)
-    for key, name in [("needle_flaky", "针片状候选"), ("round", "圆形"), ("angular", "棱角状"), ("regular", "普通")]:
+    for key, name in [("needle_flaky", "needle_flaky"), ("round", "round"), ("angular", "angular"), ("regular", "regular")]:
         out = out_dir / f"{stem}_shape_{key}.png"
-        _plot_single_class_overlay(image_path, mask_path, df, "shape_class", key, out, resolution, f"形状:{name}")
+        _plot_single_class_overlay(image_path, mask_path, df, "shape_class", key, out, resolution, f"Shape: {name}")
 
 
 def plot_anomaly_gallery(
@@ -187,17 +187,15 @@ def plot_anomaly_gallery(
     resolution: float | None,
     stem: str,
 ):
-    """任务4：>50 异物 / 泥团 / 噪声 各一张（有则出图）。"""
+    """任务4：>50 异物 / 泥团 / 噪声 各一张（有则出图，英文标题避字体缺字）。"""
     out_dir = Path(out_dir)
-    # 仅当该类存在时出图，避免空图刷屏
-    for key, name in [("oversized", "大块异物>50mm"), ("suspect_mud", "疑似泥团"), ("undersized", "过小噪声<5mm")]:
+    for key, name in [("oversized", "oversized (>50mm)"), ("suspect_mud", "suspect_mud"), ("undersized", "undersized (<5mm)")]:
         if "anomaly_class" in df.columns and (df["anomaly_class"] == key).any():
             out = out_dir / f"{stem}_anomaly_{key}.png"
-            _plot_single_class_overlay(image_path, mask_path, df, "anomaly_class", key, out, resolution, f"异常:{name}")
+            _plot_single_class_overlay(image_path, mask_path, df, "anomaly_class", key, out, resolution, f"Anomaly: {name}")
         elif key == "oversized":
-            # 无异物时仍出一张空图作占位，明确“已检无”
             out = out_dir / f"{stem}_anomaly_{key}.png"
-            _plot_single_class_overlay(image_path, mask_path, df, "anomaly_class", key, out, resolution, f"异常:{name}（无）")
+            _plot_single_class_overlay(image_path, mask_path, df, "anomaly_class", key, out, resolution, f"Anomaly: {name} (none)")
 
 
 def plot_detection_overview(
@@ -205,19 +203,19 @@ def plot_detection_overview(
     mask_path: str | Path,
     out_path: str | Path,
 ):
-    """任务1：原图 | mask | 叠加 三联图。"""
+    """任务1：原图 | mask | 叠加 三联图（英文标题避字体缺字）。"""
     img = _load_image(image_path)
     mask = _load_mask(mask_path)
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     axes[0].imshow(img)
-    axes[0].set_title("原图")
+    axes[0].set_title("Original")
     axes[0].set_axis_off()
     axes[1].imshow(mask, cmap="nipy_spectral")
     axes[1].set_title(f"Mask  N={len(np.unique(mask))-1}")
     axes[1].set_axis_off()
     axes[2].imshow(img, alpha=0.6)
     axes[2].imshow(mask, cmap="nipy_spectral", alpha=0.45)
-    axes[2].set_title("叠加")
+    axes[2].set_title("Overlay")
     axes[2].set_axis_off()
     fig.tight_layout(pad=0.5)
     fig.savefig(out_path, dpi=150)

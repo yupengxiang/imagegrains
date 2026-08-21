@@ -11,7 +11,7 @@ import pandas as pd
 
 from imagegrains import grainsizing
 
-from . import anomaly, morphology, report
+from . import anomaly, morphology, report, visualization
 from .sieve_equivalent import DEFAULT_GAMMA, DEFAULT_THETA, load_grains_csv, normalize_grains
 
 
@@ -25,6 +25,51 @@ def _parse_theta(s: str | None) -> tuple[float, float, float]:
         return (float(parts[0]), float(parts[1]), float(parts[2]))
     except ValueError as e:
         raise ValueError(f"--theta 解析失败: {s!r}") from e
+
+
+def _find_image_for_grains(grains_path: Path, search_dirs: list[Path] | None = None) -> Path | None:
+    """按 grains 名猜原图（去 _pred/_re_scaled 等后缀后试 jpg/png/tif）。"""
+    stem = grains_path.stem
+    # 去常见后缀
+    for suf in ["_pred_grains_re_scaled", "_pred_grains", "_grains_re_scaled", "_grains"]:
+        if stem.endswith(suf):
+            stem = stem[: -len(suf)]
+            break
+    # 也去 _IG2_full_set_cp_SAM 等模型后缀
+    if "_IG2" in stem:
+        stem = stem.split("_IG2")[0]
+    candidates = []
+    if search_dirs:
+        for d in search_dirs:
+            for ext in [".jpg", ".JPG", ".png", ".tif", ".tiff"]:
+                candidates.append(d / f"{stem}{ext}")
+                candidates.append(d / f"{stem}_pred{ext}")  # 容错
+    # 就近目录
+    for ext in [".jpg", ".JPG", ".png", ".tif"]:
+        candidates.append(grains_path.parent / f"{stem}{ext}")
+        candidates.append(grains_path.parent.parent / "samples" / f"{stem}{ext}")
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def _find_mask_for_grains(grains_path: Path, out_dir: Path) -> Path | None:
+    stem = grains_path.stem
+    # 尝试多个候选目录
+    search_dirs = [out_dir, grains_path.parent, Path("demo_data/samples/results"), Path("demo_data/test_out"), Path("demo_data/test_out/reports")]
+    base = stem.split("_pred")[0]
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for pat in [f"{base}*_pred.tif", f"{base}*.tif", f"{stem}*_pred.tif"]:
+            for p in d.glob(pat):
+                if p.exists():
+                    return p
+    # 兜底：out_dir 下任意 tif
+    for p in out_dir.glob("*.tif"):
+        return p
+    return None
 
 
 def plot_gsd_comparison(
@@ -104,6 +149,19 @@ def analyze_grains_csv(
     if plot:
         plot_gsd_comparison(df_norm, resolution_eff, Path(out_dir) / f"{path.stem}_gsd_comparison.png", theta=theta, gamma=gamma)
         print(">> 已保存 GSD 对比图到:", Path(out_dir).resolve())
+        # 任务2/3/4 增强可视化（需原图/mask，缺失则跳过）
+        try:
+            img_path = _find_image_for_grains(path, [Path("demo_data/samples"), Path("demo_data/test"), Path.cwd()])
+            mask_path = _find_mask_for_grains(path, Path(out_dir))
+            if img_path and Path(img_path).exists():
+                visualization.plot_axes_overlay(img_path, df_final, Path(out_dir) / f"{path.stem}_axes_overlay.png", resolution=resolution_eff)
+                visualization.plot_shape_gallery(img_path, mask_path, df_final, Path(out_dir), resolution_eff, path.stem)
+                visualization.plot_anomaly_gallery(img_path, mask_path, df_final, Path(out_dir), resolution_eff, path.stem)
+                if mask_path and Path(mask_path).exists():
+                    visualization.plot_detection_overview(img_path, mask_path, Path(out_dir) / f"{path.stem}_detection_overview.png")
+                print(">> 已保存增强可视化到:", Path(out_dir).resolve())
+        except Exception as e:
+            print(f">> 可视化跳过: {e}")
     print(report.format_report_text(summary))
     return summary
 
@@ -130,6 +188,27 @@ def analyze_mask_dir(
     if plot:
         plot_gsd_comparison(df_norm, resolution, Path(out_dir) / "batch_gsd_comparison.png", theta=theta, gamma=gamma)
         print(">> 已保存 GSD 对比图到:", Path(out_dir).resolve())
+        try:
+            # 取首张图为例做可视化
+            if imgs:
+                first_img = Path(imgs[0]) if isinstance(imgs[0], (str, Path)) else None
+                first_mask = Path(masks[0]) if masks and isinstance(masks[0], (str, Path)) else None
+                # load_from_folders 返回的可能是数组，需回退到目录首张
+                if first_img is None or not first_img.exists():
+                    cand = list(Path(img_dir).glob("*.*"))
+                    first_img = cand[0] if cand else None
+                if first_mask is None or not first_mask.exists():
+                    cand_m = list(Path(mask_dir).glob("*.tif"))
+                    first_mask = cand_m[0] if cand_m else None
+                if first_img and Path(first_img).exists():
+                    visualization.plot_axes_overlay(first_img, df_final, Path(out_dir) / "batch_axes_overlay.png", resolution=resolution)
+                    visualization.plot_shape_gallery(first_img, first_mask, df_final, Path(out_dir), resolution, "batch")
+                    visualization.plot_anomaly_gallery(first_img, first_mask, df_final, Path(out_dir), resolution, "batch")
+                    if first_mask and Path(first_mask).exists():
+                        visualization.plot_detection_overview(first_img, first_mask, Path(out_dir) / "batch_detection_overview.png")
+                    print(">> 已保存增强可视化到:", Path(out_dir).resolve())
+        except Exception as e:
+            print(f">> 可视化跳过: {e}")
     print(report.format_report_text(summary))
     return summary
 

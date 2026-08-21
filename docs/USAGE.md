@@ -128,6 +128,10 @@ python -m aggregate_screening --img_dir <图> --mask_dir <mask> --resolution 0.3
 | `<场景>_report.txt` | 人读报告（D 值/粒级/形貌/异常） |
 | `<场景>_particles_annotated.csv` | 明细 + `shape_*/anomaly_*` 列 |
 | `<场景>_gsd_comparison.png` | 数量 vs 质量累计曲线 + 粒级柱状图 |
+| `<场景>_detection_overview.png` | 任务1：原图｜mask｜叠加 三联图 |
+| `<场景>_axes_overlay.png` | 任务2：长（青）短（红）轴 + 右下比例尺 |
+| `<场景>_shape_*.png` | 任务3：`needle_flaky/round/angular/regular` 各一张高亮 |
+| `<场景>_anomaly_*.png` | 任务4：`oversized/suspect_mud/undersized`（有则出图） |
 
 ---
 
@@ -258,13 +262,15 @@ cat demo_data/samples/demo/report/agg_001*report.txt
 # 形貌：针片 16.3% 圆 8.0% 棱角 16.4% 普通 59.3%（任务3，shape_class 列）
 # 异常：<5 噪声 731 颗 38%  >50 0 颗（任务4，大块靠粒径；泥团当前仅 40-50 & solidity 几何兜底，需新数据训 crop 分类器）
 ls demo_data/samples/demo/report/
-# agg_001..._summary.json（结构化，percentiles_mass_weighted/mass_fractions）
-# agg_001..._particles_annotated.csv（逐粒 b_mm/a_mm/d_eq_mm/shape_*/anomaly_*）
-# agg_001..._gsd_comparison.png（左橙质量累计 vs 蓝数量，右柱质量占比，对标筛分）
-# 已提交结果可直接看：cat demo_data/samples/results/agg_001*report.txt
+# agg_001..._summary.json / _particles_annotated.csv / _gsd_comparison.png（任务2）
+# agg_001..._detection_overview.png（任务1 三联）
+# agg_001..._axes_overlay.png（任务2 长短轴+比例尺）
+# agg_001..._shape_*.png（任务3 4 张）
+# agg_001..._anomaly_*.png（任务4 有则出）
+# 已提交结果可直接看：ls demo_data/samples/results/ | grep agg_001
 ```
 
-> 三样本的推理结果已提交至 `demo_data/samples/results/`（29 MB，24 文件），免重复推理；`demo/` 为本次演示输出，与 `results/` 结构一致可比对。
+> 三样本的推理结果已提交至 `demo_data/samples/results/`（75 MB，48 文件：每样本 `pred.tif/composite.png` + `*grains.csv`2 + `reports` 11 件含 8 张可视化），免重复推理；`demo/` 为本次演示输出，与 `results/` 同构可比对。
 
 `GSD_uncertainty/*_full_uncertainty.csv` 为数量口径 bootstrap 95% CI（`lower/median/upper/value`），答辩展示用，非评分。
 
@@ -279,10 +285,10 @@ ls demo_data/samples/demo/report/
 
 | 赛题 `docs/task.md` | 代码过程 | 关键输出 | 判定 |
 | --- | --- | --- | --- |
-| **1 精细识别** 分割+粘连分离 | `segmentation_helper.predict_folder`（Cellpose-SAM） | `demo_data/test_out/*_pred.tif`（实例 mask，`1…N`）、`*_composite.png` 目检 | 颗粒与背景/颗粒间粘连分离 |
-| **2 粒径分析** 直径+分布 `D10/50/90` | `grainsizing.batch_grainsize` + `sieve_equivalent.normalize_grains → SieveAnalysis(d=θb+θd_eq, w=d³)` | `*_pred_grains.csv`（`b/a px`）→ `*_re_scaled.csv`（`b/a mm` 2 列追加）→ `reports/*summary.json:percentiles_mass_weighted/mass_fractions`、`_gsd_comparison.png:1` 右柱/左橙线 | 数量 vs 质量双口径，质量对标筛分 |
-| **3 形状分类** 针片/圆/棱角 | `morphology.classify_dataset`（`MorphThresholds`） | `reports/*_particles_annotated.csv:shape_class/label`、`summary.json:shape` | 投影形貌，阈值可标定 |
-| **4 异常** >50 异物/泥团 | `anomaly.classify_anomalies`（`FOREIGN_MIN>50`, `MUD_BAND 40–50 & solidity`） | 同表 `anomaly_class/label`、`summary.json:anomalies`；大块靠粒径，泥团当前仅几何兜底 | 泥团需 `crop` 颜色/纹理分类器（需新数据，`TODO P1`） |
+| **1 精细识别** 分割+粘连分离 | `segmentation_helper.predict_folder`（Cellpose-SAM） | `*_pred.tif`（mask `1…N`）、`*_composite.png` 目检 + `*_detection_overview.png`（原图｜mask｜叠加） | 颗粒/背景/粘连分离可视化 |
+| **2 粒径分析** 直径+分布 `D10/50/90` | `grainsizing.batch_grainsize` + `sieve_equivalent.normalize_grains → SieveAnalysis(d=θb+θd_eq, w=d³)` | `*_pred_grains.csv`→`*_re_scaled.csv`（`b/a mm`）→ `summary.json:percentiles`、`_gsd_comparison.png` + `*_axes_overlay.png`（长短轴+比例尺，mm 可读） | 数量 vs 质量双口径，比例尺可追溯 |
+| **3 形状分类** 针片/圆/棱角 | `morphology.classify_dataset`（`MorphThresholds`） | `*_particles_annotated.csv:shape_*`、`summary.json:shape` + `*_shape_*.png`（4 张分形态高亮） | 投影形貌，直观可检 |
+| **4 异常** >50 异物/泥团 | `anomaly.classify_anomalies`（`>50` / `40–50 & solidity`） | `*_particles_annotated.csv:anomaly_*`、`summary.json:anomalies` + `*_anomaly_*.png`（有则出图） | 大块已可视化，泥团待 `crop` 分类器 |
 
 `GSD_uncertainty/*_full_uncertainty.csv:1` 的 8 列（`a/b × lower/median/upper/value`）为数量口径 bootstrap 区间，答辩展示用，非评分。
 
@@ -290,7 +296,7 @@ ls demo_data/samples/demo/report/
 
 - **GitHub 限制**：单文件硬上限 **100 MB**（`git push` 直接拒），仓库软建议 **1 GB**、硬上限约 **5 GB**，超大文件需 `git lfs`（单文件最高 5 GB，但 LFS 配额/带宽另计）。`demo_data/test` 236 MB 虽单文件未超 100 MB，但整批 `+test_out 302 MB` 推送会拖慢克隆且超软建议。
 - `demo_data/K1` 2 张（793 KB）属历史小样已跟踪（`.gitignore:20` 的 `*.jpg` 对已跟踪不生效）；全量 `test` 36 张被 `*.jpg/*.tif/*.csv/*.png` 忽略（`git check-ignore -v demo_data/test/agg_001.jpg → *.jpg`），**不可 `git add`**。
-- 约定：`test`/`test_out` 保持 `gitignored` 本地，**仅提交 3 张代表 `demo_data/samples/`（21 MB）及其推理结果 `demo_data/samples/results/`（29 MB，`!demo_data/samples/results/*` 回补）** 供上手；全量走网盘/LFS。
+- 约定：`test`/`test_out` 保持 `gitignored` 本地，**仅提交 3 张代表 `demo_data/samples/`（21 MB）及其推理结果 `demo_data/samples/results/`（75 MB，48 文件，`!demo_data/samples/results/*` 回补）** 供上手；全量走网盘/LFS。
 
 ---
 

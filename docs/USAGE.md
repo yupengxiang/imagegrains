@@ -238,32 +238,33 @@ conda activate imagegrains
 # 模型 1.2 GB 已在 .gitignore，需手动：curl -sL --retry 5 -o models/IG2_full_set_cp_SAM https://zenodo.org/records/15728186/files/IG2_full_set_cp_SAM
 
 # 1. 分割+测量（单张约 17s GPU + 9s 测量；* 支撑任务 1）
-python -m imagegrains --img_dir demo_data/samples --model_dir models --out_dir /tmp/demo --resolution 0.208 --gpu True
-# 输入：demo_data/samples/agg_001.jpg（+另 2 张）
-# 输出：/tmp/demo/agg_001_IG2_full_set_cp_SAM_pred.tif（mask 1…1924，任务1精细识别）
-#       /tmp/demo/agg_001..._composite.png（目检粘连）
-#       /tmp/demo/agg_001..._pred_grains.csv（20 列 px，任务2前半）
-#       /tmp/demo/agg_001..._pred_grains_re_scaled.csv（追加 a/b mm 2 列，rescale 仅 b/a×0.208）
+python -m imagegrains --img_dir demo_data/samples --model_dir models --out_dir demo_data/samples/demo --resolution 0.208 --gpu True
+# 输入：demo_data/samples/agg_001.jpg（+另 2 张，仓库已提交）
+# 输出：demo_data/samples/demo/agg_001_IG2_full_set_cp_SAM_pred.tif（mask 1…1924，任务1精细识别）
+#       demo_data/samples/demo/agg_001..._composite.png（目检粘连）
+#       demo_data/samples/demo/agg_001..._pred_grains.csv（20 列 px，任务2前半）
+#       demo_data/samples/demo/agg_001..._pred_grains_re_scaled.csv（追加 a/b mm 2 列，rescale 仅 b/a×0.208）
 
 # 2. 筛分报告（* 支撑任务 2/3/4，约 1s）
-python -m aggregate_screening --grains /tmp/demo/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled.csv --out_dir /tmp/demo/report
-# 也可批量：for f in /tmp/demo/*re_scaled.csv; do python -m aggregate_screening --grains $f --out_dir /tmp/demo/report; done
+python -m aggregate_screening --grains demo_data/samples/demo/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled.csv --out_dir demo_data/samples/demo/report
+# 也可批量：for f in demo_data/samples/demo/*re_scaled.csv; do python -m aggregate_screening --grains $f --out_dir demo_data/samples/demo/report; done
 
-# 3. 看结果
-cat /tmp/demo/report/agg_001*report.txt
+# 3. 看结果（与已提交的 demo_data/samples/results/ 对比）
+cat demo_data/samples/demo/report/agg_001*report.txt
 # 颗粒数 1924 分辨率 0.208 mm/px
 # D10 数量3.1/质量10.6  D50 数量6.0/质量23.5  D90 数量17.3/质量30.6
 # 剔除异常后（1193 颗正常）：D10 11.1 D50 23.6 D90 30.6  ← 提交口径（任务2）
 # 粒级 25-31.5 34.2% 为主（右柱即筛分质量直方图）
 # 形貌：针片 16.3% 圆 8.0% 棱角 16.4% 普通 59.3%（任务3，shape_class 列）
 # 异常：<5 噪声 731 颗 38%  >50 0 颗（任务4，大块靠粒径；泥团当前仅 40-50 & solidity 几何兜底，需新数据训 crop 分类器）
-ls /tmp/demo/report/
+ls demo_data/samples/demo/report/
 # agg_001..._summary.json（结构化，percentiles_mass_weighted/mass_fractions）
 # agg_001..._particles_annotated.csv（逐粒 b_mm/a_mm/d_eq_mm/shape_*/anomaly_*）
 # agg_001..._gsd_comparison.png（左橙质量累计 vs 蓝数量，右柱质量占比，对标筛分）
+# 已提交结果可直接看：cat demo_data/samples/results/agg_001*report.txt
 ```
 
-> 三样本的推理结果已提交至 `demo_data/samples/results/`（29 MB，24 文件：`*_pred.tif/_composite.png/*_grains.csv/*_re_scaled.csv` + `reports` 4 件/样本），免重复推理可直接查看比对。
+> 三样本的推理结果已提交至 `demo_data/samples/results/`（29 MB，24 文件），免重复推理；`demo/` 为本次演示输出，与 `results/` 结构一致可比对。
 
 `GSD_uncertainty/*_full_uncertainty.csv` 为数量口径 bootstrap 95% CI（`lower/median/upper/value`），答辩展示用，非评分。
 

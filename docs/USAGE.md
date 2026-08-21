@@ -263,6 +263,8 @@ ls /tmp/demo/report/
 # agg_001..._gsd_comparison.png（左橙质量累计 vs 蓝数量，右柱质量占比，对标筛分）
 ```
 
+> 三样本的推理结果已提交至 `demo_data/samples/results/`（29 MB，24 文件：`*_pred.tif/_composite.png/*_grains.csv/*_re_scaled.csv` + `reports` 4 件/样本），免重复推理可直接查看比对。
+
 `GSD_uncertainty/*_full_uncertainty.csv` 为数量口径 bootstrap 95% CI（`lower/median/upper/value`），答辩展示用，非评分。
 
 ## 11. 命名与列释疑（新人常问）
@@ -287,7 +289,7 @@ ls /tmp/demo/report/
 
 - **GitHub 限制**：单文件硬上限 **100 MB**（`git push` 直接拒），仓库软建议 **1 GB**、硬上限约 **5 GB**，超大文件需 `git lfs`（单文件最高 5 GB，但 LFS 配额/带宽另计）。`demo_data/test` 236 MB 虽单文件未超 100 MB，但整批 `+test_out 302 MB` 推送会拖慢克隆且超软建议。
 - `demo_data/K1` 2 张（793 KB）属历史小样已跟踪（`.gitignore:20` 的 `*.jpg` 对已跟踪不生效）；全量 `test` 36 张被 `*.jpg/*.tif/*.csv/*.png` 忽略（`git check-ignore -v demo_data/test/agg_001.jpg → *.jpg`），**不可 `git add`**。
-- 约定：`test`/`test_out` 保持 `gitignored` 本地，**仅提交 3 张代表 `demo_data/samples/`（`agg_001/005/029` 21 MB，`!demo_data/samples/*.jpg` 回补）** 供上手；全量走网盘/LFS。
+- 约定：`test`/`test_out` 保持 `gitignored` 本地，**仅提交 3 张代表 `demo_data/samples/`（21 MB）及其推理结果 `demo_data/samples/results/`（29 MB，`!demo_data/samples/results/*` 回补）** 供上手；全量走网盘/LFS。
 
 ---
 

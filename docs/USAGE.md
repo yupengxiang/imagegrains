@@ -232,9 +232,9 @@ tbl = report.ablation_table(df, 0.39, gammas=[1,2,3])
 
 ---
 
-## 10. 傻瓜式全流程（以仓库已提交的 `demo_data/samples/agg_001.jpg` 为例）
+## 10. 完整流程演示（以仓库已提交的 `demo_data/samples/agg_001.jpg` 为例）
 
-> 选样：全面检查 30 张（`agg_001–030` 均 `3024×4032`，`D50 质量 14.6–27.5 mm` 中位 23.6）后挑 **3 张代表进库（`samples/` 21 MB）**：`agg_029` 细粒主导（`5–10` 32.7%）、`agg_001` 中值（`25–31.5` 34.2%）、`agg_005` 粗粒（`27.5`），覆盖连续级配；`031–036` 尺截断未进库。本节以 `agg_001` 演示，另 2 张同参复跑。
+> 选样：全面检查 30 张（`agg_001–030` 均 `3024×4032`，`D50 质量 14.6–27.5 mm` 中位 23.6）后挑 **3 张代表进库（`samples/` 21 MB）**：`agg_029` 细粒主导（`5–10` 32.7%）、`agg_001` 中值（`25–31.5` 34.2%）、`agg_005` 粗粒（`27.5`），覆盖连续级配；`031–036` 尺截断未进库。本节以 `agg_001` 演示，另 2 张同参复跑。代码块路径为仓库根运行，图片为 `docs/` 视角的渲染路径。
 
 ```bash
 # 0. 环境与模型（一次）
@@ -269,6 +269,11 @@ ls demo_data/samples/demo/report/
 # agg_001..._anomaly_*.png（任务4 有则出）
 # 已提交结果可直接看：ls demo_data/samples/results/ | grep agg_001
 ```
+
+![样本原图 `agg_001.jpg`](../demo_data/samples/agg_001.jpg)
+![任务1 检测总览 `detection_overview.png`](../demo_data/samples/results/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png)
+![任务2 长短轴+比例尺 `axes_overlay.png`](../demo_data/samples/results/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png)
+![任务2 粒径分布 `gsd_comparison.png`](../demo_data/samples/results/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png)
 
 > 三样本的推理结果已提交至 `demo_data/samples/results/`（75 MB，48 文件：每样本 `pred.tif/composite.png` + `*grains.csv`2 + `reports` 11 件含 8 张可视化），免重复推理；`demo/` 为本次演示输出，与 `results/` 同构可比对。
 

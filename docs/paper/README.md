@@ -6,10 +6,29 @@
 
 - 主文件：`main.tex`
 - 参考文献：`refs.bib`
-- 正文章节：`reviewer/`
+- 正文、摘要与附录：`sections/`
 - 当前构建产物由 GitHub Actions 上传为 `technical-report-pdf`
 
-旧的 `main_submission.tex` 与 `main_v2.tex` 已移除。后续论文修改、编译和提交均以 `main.tex` 为准。
+旧的 `main_submission.tex`、`main_v2.tex` 与 `reviewer/` 章节树均已移除。后续论文修改、编译和提交均以 `main.tex` 及其实际引用的 `sections/*.tex` 为准。
+
+## 章节文件
+
+`sections/` 只保留当前正式报告实际使用的文件，不存放历史稿、`*_final.tex` 副本或未引用章节：
+
+```text
+sections/
+  00_abstract.tex
+  01_problem.tex
+  02_framework.tex
+  03_visual_measurement.tex
+  04_sieve_mapping.tex
+  05_results.tex
+  06_deployment.tex
+  07_conclusion.tex
+  08_appendix.tex
+```
+
+每个子文件首行使用 `% !TeX root = ../main.tex`，便于在 VS Code / LaTeX Workshop 中直接编辑章节时仍以 `main.tex` 为根文档。
 
 ## 报告结构
 
@@ -64,6 +83,12 @@ latexmk -xelatex -interaction=nonstopmode main.tex
 make
 ```
 
+本地环境诊断：
+
+```bash
+make doctor
+```
+
 检查：
 
 ```bash
@@ -90,10 +115,10 @@ GitHub Actions `.github/workflows/paper-build.yml` 在 `docs/paper/**` 变更后
 docs/paper/
   main.tex       # 正式报告唯一入口
   refs.bib       # 参考文献数据库
-  reviewer/      # 正文、摘要与附录
+  sections/      # 当前正式报告唯一章节树
   figures/       # 报告图形资源
   latexmkrc      # XeLaTeX 构建配置
-  Makefile       # 本地编译与检查
+  Makefile       # 本地编译、诊断与检查
   README.md      # 本文件
 ```
 

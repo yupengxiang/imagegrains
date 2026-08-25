@@ -62,7 +62,7 @@
 \label{fig:scale-provenance}
 \end{figure}
 
-若尺度估计存在相对误差 $\varepsilon_r=\Delta r/r$，则由式\eqref{eq:scale-conversion}可知，直接长度测量的一阶相对误差也约为 $\varepsilon_r$。这意味着尺度并非仅影响某一个后处理参数，而会对所有毫米级粒径产生共同的系统偏移。因此，第\ref{sec:experimental-design}节所设计的实验将单独评价尺度恢复误差，并在现场工作流中将尺度校验置于模型推理之前。完成物理尺度定义后，仍需要从自然堆积图像中恢复每个颗粒的独立实例边界。
+若尺度估计存在相对误差 $\varepsilon_r=\Delta r/r$，则由式\eqref{eq:scale-conversion}可知，直接长度测量的一阶相对误差也约为 $\varepsilon_r$。这意味着尺度并非仅影响某一个后处理参数，而会对所有毫米级粒径产生共同的系统偏移。因此，后续实验将单独评价尺度恢复误差，并在现场工作流中将尺度校验置于模型推理之前。完成物理尺度定义后，仍需要从自然堆积图像中恢复每个颗粒的独立实例边界。
 
 \subsection{基于 ImageGrains 2.0 / Cellpose-SAM 的实例分割}
 \label{sec:instance-segmentation}

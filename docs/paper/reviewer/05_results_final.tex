@@ -2,27 +2,7 @@
 \section{实验结果与分析}
 \label{sec:r-results-final}
 
-\subsection{实验材料与评价范围}
-
-本文使用三张自然堆积真实图像及其端到端输出、竞赛层合成单元测试和原型阶段算法时序作为实验材料。当前真实图像没有配对的机械筛分逐筛称量、人工实例 mask 或材料形貌标签，因此本章评价对象限定为场景输出、数量与质量代理统计差异、规则输出行为、软件一致性和计算耗时。表\ref{tab:r-final-evidence}给出各类证据的作用。
-
-\begin{table}[t]
-\centering
-\caption{本文使用的证据及其对应的结论范围。}
-\label{tab:r-final-evidence}
-\footnotesize
-\renewcommand{\arraystretch}{1.12}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{5.6cm}}
-\toprule
-证据 & 内容 & 可支持的结论 \\
-\midrule
-3 张自然堆积图像 & 原图、实例结果、逐颗粒几何、级配、形貌与异常输出 & 处理链可运行；不同场景形成不同的结构化描述 \\
-数量/质量代理统计 & 同一实例集合分别按等权和 $d^3$ 加权 & 统计口径改变 $D_p$ 与级配解释 \\
-27 项合成单元测试 & 筛分映射、加权分位数、形貌、异常、报告逻辑 & 数学定义与代码实现保持一致 \\
-历史算法时序 & 分割、几何测量和筛分统计的阶段耗时 & 计算阶段可嵌入分钟级现场流程 \\
-\bottomrule
-\end{tabular}
-\end{table}
+本文实验材料包括三张自然堆积真实图像及其端到端输出、27 项竞赛层合成单元测试和原型阶段算法时序。真实图像没有配对的机械筛分逐筛称量、人工实例 mask 或材料形貌标签，因此本章报告场景输出、数量与质量代理统计差异、规则输出行为、软件一致性和计算耗时，不将这些内部结果换算为外部物理准确率。
 
 \subsection{真实场景的级配输出}
 

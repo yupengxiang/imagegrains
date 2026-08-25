@@ -1,0 +1,73 @@
+% ===== 4 筛分级配映射方法（最终评委版） =====
+\section{从视觉颗粒到筛分级配}
+\label{sec:r-sieve-final}
+
+\subsection{二维视觉粒径与筛孔粒径的语义差异}
+
+实例分割得到的是颗粒在相机视角下的二维投影，机械筛分描述的却是颗粒在振动、翻转和多姿态条件下通过给定筛孔的行为。二者相关，但并不严格等价。因此，本文不把某一个图像几何量直接宣称为“真实筛孔粒径”，而是先从实例 mask 提取具有明确几何意义的候选尺度，再通过显式模型形成筛分等效粒径。
+
+对第 $i$ 个颗粒，记长轴为 $a_i$、短轴为 $b_i$、投影面积为 $A_i$。面积等效直径定义为
+\begin{equation}
+ d_{\mathrm{eq},i}=2\sqrt{\frac{A_i}{\pi}}.
+\label{eq:r-final-deq}
+\end{equation}
+短轴 $b_i$ 与颗粒能否通过某一筛孔具有较直观的几何联系，而 $d_{\mathrm{eq},i}$ 同时反映整体投影面积。对于细长或不规则颗粒，两者可能明显不同：仅使用面积等效直径容易把细长颗粒估得偏粗，而仅使用短轴又可能忽略整体尺度信息。基于这一考虑，系统保留一个低维、可解释的组合模型
+\begin{equation}
+ d_i=\theta_1 b_i+\theta_2 d_{\mathrm{eq},i}+\theta_3,
+\label{eq:r-final-sieve-d}
+\end{equation}
+其中 $d_i$ 为筛分等效粒径，$\boldsymbol{\theta}=(\theta_1,\theta_2,\theta_3)$ 控制二维几何量到筛分语义的映射。当前演示数据没有同批机械筛分真值，因此本文采用 $\boldsymbol{\theta}=(1,0,0)$，即以短轴作为未校准基线；这一设置的意义是给出透明、可复现的工程基准，而不是声称短轴已经等价于机械筛分粒径。
+
+\subsection{从颗粒数量到质量代理}
+
+相机天然按“颗粒个数”观察场景，而标准机械筛分结果通常按各筛级质量计算。若直接令每个实例权重相同，大量小颗粒会在统计中获得与少量大颗粒相同的单颗粒贡献，从而使视觉数量分布与称重口径产生明显差异。为此，本文采用尺寸幂律构造质量代理权重
+\begin{equation}
+ w_i=d_i^{\gamma},
+\label{eq:r-final-mass}
+\end{equation}
+其中 $\gamma$ 为质量尺度指数。若颗粒在不同尺寸上近似保持几何相似且密度变化较小，则体积量级随特征长度的三次方变化，因此当前基线取 $\gamma=3$。这一选择是几何相似性先验，而不是逐颗粒称量结果；其作用是把“按个数统计”转换为“与质量更相关的统计口径”。
+
+在此基础上定义加权经验累积分布
+\begin{equation}
+ F(d)=\frac{\sum_i w_i\,\mathbf{1}(d_i\le d)}{\sum_i w_i},
+\label{eq:r-final-cdf}
+\end{equation}
+并将特征粒径定义为
+\begin{equation}
+ D_p=\inf\{d:F(d)\ge p/100\},\qquad p\in\{10,50,90\}.
+\label{eq:r-final-dp}
+\end{equation}
+当前实现采用离散加权经验分布的左连续逆：累计质量代理首次达到目标比例时，对应的实际颗粒粒径即为 $D_p$，不在相邻颗粒之间额外插值。这样可以保证结果完全由现有颗粒实例及其权重重算得到。
+
+\subsection{标准筛级聚合}
+
+赛题主粒径范围为 5--40~mm。系统以 $\{5,10,16,20,25,31.5,40\}$~mm 为筛级边界，将每个 $d_i$ 聚合到相应区间，同时保留 $<5$~mm 与 $\ge40$~mm 两个边界区间用于质量控制。对第 $k$ 个粒级 $B_k$，其质量代理占比为
+\begin{equation}
+ P_k=\frac{\sum_{i:d_i\in B_k}w_i}{\sum_iw_i}.
+\label{eq:r-final-bin}
+\end{equation}
+由此，逐颗粒几何表可以统一生成筛级比例、累计分布和 $D_{10}/D_{50}/D_{90}$。这种显式计算方式的一个重要优点是可追溯：任一场景级比例都可以反查到贡献最大的具体实例，而不是仅得到一个无法解释的黑盒回归值。
+
+\begin{table}[t]
+\centering
+\caption{评委版采用的筛分语义参数及其当前角色。}
+\label{tab:r-final-sieve-params}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{6.7cm}}
+\toprule
+参数 & 当前设置 & 解释 \\
+\midrule
+$r$ & 每幅图像的 mm/px & 相机几何的物理尺度，由参考物确定 \\
+$\boldsymbol{\theta}$ & $(1,0,0)$ & 当前以短轴作为筛分等效粒径基线；无机械真值时不做数据驱动调参 \\
+$\gamma$ & 3 & 几何相似条件下的体积/质量代理先验，不等同于真实单颗粒质量 \\
+筛级边界 & 5, 10, 16, 20, 25, 31.5, 40~mm & 固定工程统计口径，不随样本调整 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{参数校准接口与本文采用的证据边界}
+
+代码中保留了基于差分进化的参数校准接口，可在存在配对机械筛分数据时搜索 $\theta_1,\theta_2\in[0,3]$、$\theta_3\in[-20,20]$~mm 和 $\gamma\in[1,5]$，并以 $D_{10}/D_{50}/D_{90}$ 的相对误差构造目标函数。之所以使用低维显式模型而非端到端直接回归级配，是为了使每个参数都具有可解释作用，并避免少量物理样本条件下引入大量不可辨识自由度。
+
+但本文最终报告以当前已获得的数据为完整证据集，没有同批机械筛分逐筛称量，因此\textbf{不执行这一校准步骤，也不报告机械筛分准确率}。这并不影响式\eqref{eq:r-final-sieve-d}--\eqref{eq:r-final-bin}作为完整计算链的定义：当前结果统一解释为“基于二维实例几何和 $d^3$ 权重得到的视觉质量代理级配”。第\ref{sec:r-results-final}节据此评价三件能够由现有证据直接支持的事情：处理链是否完整可运行、不同自然堆积场景能否产生有区分度的级配描述，以及数量统计与质量代理统计之间的差异有多大。

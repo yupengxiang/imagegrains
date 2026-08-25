@@ -1,0 +1,95 @@
+% !TeX program = xelatex
+% 混凝土骨料颗粒智能筛分比拼 — 技术报告 V2（模块化重写）
+% 编译: latexmk -xelatex main_v2.tex
+
+\documentclass[UTF8,a4paper,12pt,fontset=fandol]{ctexart}
+
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath,amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage{cleveref}
+\usepackage[htt]{hyphenat}
+\usepackage{seqsplit}
+\usepackage{array}
+\usepackage{siunitx}
+\sisetup{uncertainty-mode=separate, per-mode=symbol, mode=match, propagate-math-font=true}
+\usepackage[section]{placeins}
+\usepackage{amsthm}
+
+\captionsetup{font=footnotesize, labelfont=bf, width=0.92\linewidth, justification=raggedright, singlelinecheck=false}
+\graphicspath{{figures/}{../../demo_data/samples/results/}{../../demo_data/samples/}{../assets/}}
+
+\theoremstyle{definition}
+\newtheorem{definition}{定义}[section]
+\newtheorem{assumption}{假设}[section]
+
+\Crefname{figure}{图}{图}
+\Crefname{table}{表}{表}
+\crefname{table}{表}{表}
+\crefname{figure}{图}{图}
+\Crefname{equation}{式}{式}
+\Crefname{section}{节}{节}
+\newcommand{\crefpairconjunction}{、}
+\newcommand{\crefrangeconjunction}{～}
+\newcommand{\creflastconjunction}{、}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=green!50!black,
+  urlcolor=blue!70!black,
+  pdftitle={混凝土骨料颗粒智能筛分技术报告},
+  pdfauthor={匿名},
+  breaklinks=true
+}
+
+\setlength{\emergencystretch}{10em}
+\sloppy
+\hyphenpenalty=500
+\tolerance=1000
+
+\title{\bfseries 混凝土骨料颗粒智能筛分技术报告\\
+\large 自然堆积赛道：基于实例感知与质量级配映射的视觉筛分方法}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+% 摘要将在方法与实验定稿后回填，避免提前固化未经验证的结论。
+
+\tableofcontents
+\clearpage
+
+\input{sections/01_introduction}
+
+% 后续章节按写作进度逐步接入：
+% \input{sections/02_system_design}
+% \input{sections/03_visual_measurement}
+% \input{sections/04_sieve_mapping}
+% \input{sections/05_shape_anomaly}
+% \input{sections/06_experimental_design}
+% \input{sections/07_results}
+% \input{sections/08_deployment}
+% \input{sections/09_limitations}
+% \input{sections/10_conclusion}
+
+\bibliographystyle{gbt7714-numerical}
+\bibliography{refs}
+
+\end{document}

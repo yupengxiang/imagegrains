@@ -1,0 +1,171 @@
+% ===== 5 实验结果与分析（最终评委版） =====
+\section{实验结果与分析}
+\label{sec:r-results-final}
+
+\subsection{数据与评价定位}
+
+本文最终报告以仓库中现有数据作为完整证据集，不再假设后续补充机械筛分或人工标注。现有证据包括三张自然堆积真实图像及其端到端输出、竞赛层合成单元测试，以及原型运行过程中记录的算法时序。由于不存在与三张图像一一配对的机械筛分逐筛称量结果，也没有人工实例 mask 或材料形貌标签，本文的实验评价重点相应限定为：\textbf{端到端功能闭环、场景间输出差异、统计口径的行为性影响、规则输出的可解释性和软件实现一致性}。这一评价定位能够支持工程可行性与方法逻辑，但不把内部模型输出包装成外部物理准确率。
+
+\begin{table}[t]
+\centering
+\caption{本文最终使用的证据及其能够支持的结论。}
+\label{tab:r-final-evidence}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{5.6cm}}
+\toprule
+证据 & 内容 & 可支持的结论 \\
+\midrule
+3 张自然堆积图像 & 原图、实例结果、逐颗粒几何、级配、形貌与异常输出 & 处理链可运行；不同场景能够形成不同的结构化描述 \\
+数量/质量代理统计 & 同一实例集合分别按等权和 $d^3$ 加权 & 统计口径会显著改变 $D_p$ 与级配解释 \\
+27 项合成单元测试 & 筛分映射、加权分位数、形貌、异常、报告逻辑 & 数学定义与代码实现的一致性 \\
+历史算法时序 & 分割、几何测量和筛分统计的阶段耗时 & 计算阶段具备分钟级现场流程的可行性 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{真实自然堆积图像的端到端输出}
+
+三张样本分别为 \texttt{agg\_001}、\texttt{agg\_005} 和 \texttt{agg\_029}，图像尺寸均约为 3024$\times$4032，现有产物中使用的尺度为 0.208~mm/px。三张图共检测到 3858 个实例，并生成逐颗粒几何表、筛分等效粒径、质量代理级配、投影形貌标签、异常候选和场景级可视化。表\ref{tab:r-final-demo-main}给出在当前异常规则筛选后的正常实例口径下，采用 $\boldsymbol{\theta}=(1,0,0)$、$\gamma=3$ 得到的主要输出。
+
+\begin{table}[t]
+\centering
+\caption{三张自然堆积样本的视觉质量代理级配输出。}
+\label{tab:r-final-demo-main}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrrrll}
+\toprule
+样本 & 实例数 & 正常实例 & $D_{10}$ & $D_{50}$ & $D_{90}$ & 主粒级 \\
+ & & & \multicolumn{3}{c}{/ mm} & \\
+\midrule
+\texttt{agg\_001} & 1924 & 1193 & 11.1 & 23.6 & 30.6 & 25--31.5~mm（34.2\%） \\
+\texttt{agg\_005} & 968 & 703 & 15.6 & 27.5 & 38.0 & 25--31.5~mm（29.7\%） \\
+\texttt{agg\_029} & 966 & 520 & 6.7 & 14.6 & 30.6 & 5--10~mm（32.7\%） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+三张场景的预测结构并未退化为相近结果。\texttt{agg\_005} 的粗粒尾部最强，$D_{50}$ 和 $D_{90}$ 均较高；\texttt{agg\_029} 则明显偏细，主粒级落在 5--10~mm。按当前质量代理统计，\texttt{agg\_001} 的 20--31.5~mm 合计约 55.3\%，\texttt{agg\_005} 的 25--40~mm 约 55.6\%，而 \texttt{agg\_029} 的 5--16~mm 约 51.9\%。这说明同一算法链能够把不同自然堆积场景转换为有区分度的场景级描述。
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.32\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{\texttt{agg\_001}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{\texttt{agg\_005}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{\texttt{agg\_029}}
+\end{subfigure}
+\caption{三张样本的数量型与质量代理型粒径分布。图用于比较场景结构和统计口径；由于没有机械筛分真值，不解释为物理误差曲线。}
+\label{fig:r-final-three-gsd}
+\end{figure}
+
+\subsection{数量分布与质量代理分布的差异}
+
+现有结果中最稳定、也最直接对应本文建模动机的现象，是\textbf{按颗粒个数统计与按质量代理统计会得到完全不同的粒径分布中心}。表\ref{tab:r-final-number-mass}在同一实例集合上比较等权统计和 $d^3$ 加权统计。三张图的数量型 $D_{50}$ 仅为 5.2--7.6~mm，而质量代理 $D_{50}$ 为 14.1--27.5~mm，三个场景的变化方向完全一致。
+
+\begin{table}[t]
+\centering
+\caption{数量型与质量代理型分位数比较。}
+\label{tab:r-final-number-mass}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{数量型 / mm} & \multicolumn{3}{c}{质量代理 / mm} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+样本 & $D_{10}$ & $D_{50}$ & $D_{90}$ & $D_{10}$ & $D_{50}$ & $D_{90}$ \\
+\midrule
+\texttt{agg\_001} & 3.1 & 6.0 & 17.3 & 10.6 & 23.5 & 30.6 \\
+\texttt{agg\_005} & 3.3 & 7.6 & 24.5 & 15.4 & 27.5 & 38.0 \\
+\texttt{agg\_029} & 3.0 & 5.2 & 9.2 & 5.9 & 14.1 & 30.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这一变化并非偶然。自然堆积图像中，小颗粒和小目标在“个数”上占比较高，但单颗粒对总质量的贡献通常较低；相反，少量粗颗粒虽然数量不多，却可能主导质量端累计分布。以 \texttt{agg\_001} 为例，$<5$~mm 实例占全部检测数量约 38.0\%，但将这些小目标从正常口径中排除后，质量代理 $D_{50}$ 仅由约 23.50~mm 变化到 23.56~mm。这个结果说明，直接用实例数量直方图代替机械筛分式的质量统计会过度强调大量小目标。
+
+同样的机制也解释了为什么 merge 错误需要重点关注：若两个相邻颗粒被合并成一个偏大的实例，错误粒径会进一步被 $d^3$ 权重放大，对粗端级配和高分位数产生比普通像素边界误差更大的影响。因此，实例分割在本系统中的价值不只是“把石子圈出来”，而是控制下游质量代理的误差放大源。
+
+需要明确的是，上述结果能够证明\textbf{数量口径与质量相关口径不可混用}，但不能单独证明 $\gamma=3$ 就是真实骨料质量的最优指数。本文因此把 $d^3$ 始终称为质量代理或几何先验，而不称为实际称量质量。
+
+\subsection{投影形貌与异常候选结果}
+
+同一实例几何被进一步用于形貌和异常输出。表\ref{tab:r-final-shape}显示，三张图均产生了非退化的二维投影形貌分布：普通类约占 55.0\%--64.1\%，针片状候选约占 14.0\%--20.9\%。\texttt{agg\_005} 的针片状候选比例相对较高，\texttt{agg\_029} 的圆形比例相对较高。由于这些类别由 AR、圆度和凸度阈值定义，它们更适合作为可解释的二维轮廓统计，而不是三维针片状量规试验的替代。
+
+\begin{table}[t]
+\centering
+\caption{三张样本的二维投影形貌规则输出（占全部检测实例比例，\%）。}
+\label{tab:r-final-shape}
+\footnotesize
+\begin{tabular}{lrrrr}
+\toprule
+样本 & 针片状候选 & 圆形 & 棱角状 & 普通 \\
+\midrule
+\texttt{agg\_001} & 16.3 & 8.0 & 16.4 & 59.3 \\
+\texttt{agg\_005} & 20.9 & 6.6 & 17.6 & 55.0 \\
+\texttt{agg\_029} & 14.0 & 11.0 & 11.0 & 64.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_needle_flaky.png}
+\caption{针片状候选}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_round.png}
+\caption{圆形}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_angular.png}
+\caption{棱角状}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_regular.png}
+\caption{普通}
+\end{subfigure}
+\caption{\texttt{agg\_001} 的二维投影形貌高亮，用于检查规则定位与几何定义是否一致。}
+\label{fig:r-final-shape-montage}
+\end{figure}
+
+异常规则当前主要识别到 $<5$~mm 小目标，三张样本均未触发 $>50$~mm oversized 或疑似泥团规则，如表\ref{tab:r-final-anomaly}所示。这里的正确解释不是“异常检测准确率为 100\%”，而是现有三张图中没有形成可检验 oversized/泥团召回率的阳性样本。因而，本报告只把该分支视为已经接入完整处理链的规则型候选筛查能力。
+
+\begin{table}[t]
+\centering
+\caption{三张样本的异常规则输出（实例数）。}
+\label{tab:r-final-anomaly}
+\footnotesize
+\begin{tabular}{lrrrr}
+\toprule
+样本 & 正常 & $>50$~mm & $<5$~mm & 疑似泥团 \\
+\midrule
+\texttt{agg\_001} & 1193 & 0 & 731 & 0 \\
+\texttt{agg\_005} & 703 & 0 & 265 & 0 \\
+\texttt{agg\_029} & 520 & 0 & 446 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{软件一致性与运行效率}
+
+仓库中的竞赛层测试覆盖筛分等效粒径、质量权重、加权分位数、形貌规则、异常优先级和报告生成，共 27 项合成测试，当前记录全部通过。合成测试能够构造已知输入并检查输出是否严格符合公式和规则，因此它证明的是\textbf{数学定义与实现的一致性}，而不是现实骨料的外部准确率。这种区分很重要：一条通过全部单元测试的筛分映射仍可能因为二维投影假设或质量代理不充分而与真实机械筛分存在偏差。
+
+原型历史运行记录约为实例分割 17~s、几何测量 9~s、筛分与报告统计小于 1~s，即算法阶段约 27~s/张。该时序不是完整现场 SOP 的实测总耗时，但说明神经网络推理和后处理本身不会占满赛题 30~min 时间窗口。现场时间更应留给尺度确认、图像质检、首次模型加载、结果复核和一次必要的重拍/复跑，第\ref{sec:r-deploy-final}节据此给出完整操作预算。
+
+\subsection{结果解释与证据边界}
+
+综合现有数据，可以得到四个层次清楚、且不依赖外部真值的结论。第一，系统已经完成从真实自然堆积图像到逐颗粒和场景级报告的端到端闭环。第二，三张不同场景产生了明显不同的 $D_p$、主粒级和完整分布形状，说明输出能够表征场景差异。第三，同一实例集合从数量等权切换到 $d^3$ 质量代理后，$D_{50}$ 在三个场景中均显著向粗端移动，直接证明统计口径是视觉筛分中不可忽略的建模环节。第四，形貌、异常和 27 项合成测试证明各功能分支及其报告逻辑已经统一接入同一数据链。
+
+同时，有三类结论本文明确不作宣称：\textbf{机械筛分绝对准确率、实例分割外部 P/R/F1、三维针片状或泥团语义准确率}。它们分别需要机械称量、人工实例 mask 和材料/量规标签，而这些数据不在当前证据集中。将这一边界明确写入结果章，可以避免把“模型内部自洽”误写成“外部物理正确”，也使本文的结论与现有数据保持一一对应。

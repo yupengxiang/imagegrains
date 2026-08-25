@@ -1,147 +1,127 @@
-# 当前交接：文档重构完成（2026-08）
+# 当前交接：竞赛技术报告定稿阶段（2026-08-25）
 
-## 任务目标
+## 当前目标
 
-在 `9435f9b` 代码优雅重构（dataclass、_columns、单一流水线）后，对齐并瘦身文档，使 `Readme→USAGE→architecture/data-flow` 单向导航且与代码一致。新人 10 分钟可跑通一键流程。
+以现有代码、三张真实自然堆积样本及已有运行记录完成“混凝土骨料颗粒智能筛分比拼”自然堆积赛道的正式技术报告和后续答辩材料。
 
-## 已完成步骤
+当前阶段不再安排新的机械筛分、人工实例标注或现场采样实验。报告必须基于现有证据完成闭环，不保留“待补真值”“后续回填实验表”等中期稿叙事。
 
-- 代码重构 `9435f9b`：`_columns.py` 列名单一来源、`SieveAnalysis`/`CalibrationResult`/`SceneSummary` dataclass、`size_fractions` dict、`infer_resolution`/`normalize_grains` 显式化、`morphology` 显式优先级、`anomaly` 统一命名、`app` 懒加载绘图去 CSV 回读；27 passed。
-- 文档重构：
-  - `Readme.md` 顶部竞赛横幅（指向 `USAGE.md`/`task.md`）
-  - `docs/USAGE.md` 329→~270 行：`load_grains_csv` 链、`SceneSummary` API、`CalibrationResult`、合并答疑与排障、导航去 `ai/*`
-  - `docs/architecture.md`/`data-flow.md` 四步链 + `_columns`/`scipy`，删"尚未实现"
-  - `docs/ai/*` 收束：`project-overview`/`DECISIONS`/`PLAN`/`TODO` 同步已落地事实
+## 唯一论文入口
 
-## 改动文件
+- 正式报告：`docs/paper/main.tex`
+- `docs/paper/main_submission.tex`：已删除
+- `docs/paper/main_v2.tex`：已删除
+- CI：`.github/workflows/paper-build.yml` 只编译 `docs/paper/main.tex`
+- PDF artifact：`technical-report-pdf`
 
-- `Readme.md`、`docs/USAGE.md`、`docs/architecture.md`、`docs/data-flow.md`、`docs/ai/*`（project-overview/DECISIONS/PLAN/HANDOFF/TODO）
+正文由 `docs/paper/reviewer/` 下的 7 个章节、参考文献和附录组成。
 
-## 重要决策
+## 当前论文结构
 
-- `docs/ai/*` 仅面向 agent，`USAGE` 不再向外部指向它（`AGENTS.md` 保留内部入口）。
-- 文档瘦身保留全量参数表与列说明，仅删重复叙述。
-- 列名以 `_columns.py` 为权威，`load_grains_df` 为兼容旧名。
+1. 问题定义与主要贡献
+2. 总体框架与技术路线
+3. 视觉感知与物理测量
+4. 从视觉颗粒到筛分级配
+5. 实验结果与分析
+6. 工程部署、质量控制与方法边界
+7. 结论
+8. 参考文献
+9. 附录：关键参数与输出说明
 
-## 已运行验证
+正文目标是正式竞赛技术论文，而不是开发日志或待补实验的阶段报告。
 
-- `python -m pytest -q` 27 passed；`python -m aggregate_screening --grains ..._re_scaled.csv` 报告与对比图正常；`python -m compileall docs`（纯文档无需 pytest）。
+## 当前证据集
 
-## 已知问题
+三张真实自然堆积样本：
 
-- 形貌/泥团阈值、θ/γ 仍为经验基线，需真实筛分数据校准。
-- ArUco 标定、泥团分类器、一键 GUI 仍为 TODO。
+- `agg_001.JPG`
+- `agg_005.JPG`
+- `agg_029.JPG`
 
-## 下一步建议
+三张图共 3858 个实例。当前演示尺度约 0.208 mm/px，统一使用：
 
-1. 采批料筛分实验校准 θ/γ
-2. 评估真实分割质量
-3. ArUco 标定
+- `theta=(1,0,0)`：短轴作为筛分等效粒径基线；
+- `gamma=3`：`w=d^gamma` 质量代理先验。
 
----
+正常实例口径下的质量代理结果：
 
-# 当前交接：竞赛工程层 MVP 完成（2026-08-16）
+- `agg_001`: D10=11.1, D50=23.6, D90=30.6 mm；
+- `agg_005`: D10=15.6, D50=27.5, D90=38.0 mm；
+- `agg_029`: D10=6.7, D50=14.6, D90=30.6 mm。
 
-## 任务目标
+同一实例集合的数量型 vs 质量代理型 D50：
 
-在自然堆积赛道（`docs/task.md`）上基于 ImageGrains 2.0 构建骨料智能筛分系统。本轮在跑通官方工作流后，用 demo 数据完成了竞赛工程层第一版。
+- `agg_001`: 6.0 -> 23.5 mm；
+- `agg_005`: 7.6 -> 27.5 mm；
+- `agg_029`: 5.2 -> 14.1 mm。
 
-## 已完成步骤
+竞赛工程层合成测试：27 passed。
 
-- 环境：conda `imagegrains`（py3.10）+ `pip install -e '.[test]'`；GPU RTX 4080 SUPER 可用；模型 `~/imagegrains/models/IG2_full_set_cp_SAM`（Zenodo 重新下载的完整版 1.2GB）。
-- 官方工作流全闭环：分割(2.8s/张) → 粒径 → mm 尺度(0.39) → GSD+bootstrap，demo 57 颗粒。
-- 新建 `src/aggregate_screening/` 子包（竞赛工程层，不修改上游源码）：
-  - `sieve_equivalent.py`：等效粒径 d=θ₁b+θ₂d_eq+θ₃、质量加权 w=d^γ、质量加权 D10/D50/D90（阶梯逆 CDF）、粒级质量占比、`fit_calibration`（differential_evolution，合成数据可恢复真参数）、`load_grains_df`（mm/px 双列自动推断分辨率）。
-  - `morphology.py`：形貌分类规则法（针片状候选/圆形/棱角状/普通），阈值可配置。
-  - `anomaly.py`：>50mm 异物、<5mm 噪声、疑似泥团兜底规则（可关闭）。
-  - `report.py`：场景汇总（数量 vs 质量加权对照、剔除异常后正常骨料口径、消融表）、txt/json 报告。
-  - `app.py` + `__main__.py`：一键 CLI。
-- demo 演示结果（`4_P1060348_3`，57 颗）：数量 D50=9.2 → 质量加权(全颗粒) D50=67.1（被 67mm 异物主导，正确行为）→ **剔除异常后 D50=18.8 / D90=28.1**；粒级占比全部落在 5-31.5mm。
-- 测试：26 passed（含拟合恢复参数、形貌/异常边界、报告完整性）。
+已有算法阶段记录约 27 s/张（约 17 s 实例分割 + 9 s 几何测量 + <1 s 筛分/报告），只作为计算阶段时序，不写成完整 30 min SOP 的实测证明。
 
-## 改动文件
+## 证据边界
 
-- 新增：`src/aggregate_screening/`（6 个 .py）、`tests/test_sieve_equivalent.py`、`tests/test_morphology.py`、`tests/test_anomaly.py`、`tests/test_report.py`。
-- 更新：`docs/architecture.md`、`docs/data-flow.md`（竞赛工程层一节）、`docs/ai/PLAN.md`、`docs/ai/HANDOFF.md`（本文件）、`docs/ai/TODO.md`。
-- 未提交；另有 `opencode.json`（项目权限配置，edit=allow）。
+当前报告不具备：
 
-## 重要决策
+- 与三张图配对的机械筛分逐筛称量；
+- 人工实例 mask；
+- 三维针片状量规标签；
+- 泥团/材料语义阳性标签。
 
-- 报告默认口径：剔除异常物后统计正常骨料（异物不参与级配，符合竞赛语义）；`exclude_anomalies=False` 可关。
-- 质量加权用阶梯逆 CDF（与"50% 质量通过筛孔"物理语义一致），拟合用无梯度差分进化。
-- 形貌/异常阈值均为经验基线，需要真实骨料数据标定（标注于各模块 docstring）。
+因此全文统一采用以下术语：
 
-## 已运行验证
+- `视觉质量代理级配`，不写“标准筛分准确率”；
+- `投影形貌`，不写“三维针片状真值”；
+- `异常候选`，不写“泥团识别准确率”；
+- 27 项测试用于说明实现一致性，不作为现实精度证据。
 
-- `pytest tests/`：26 passed。
-- `python -m aggregate_screening --grains ..._re_scaled.csv --out_dir /tmp/ig_report`：报告、JSON、对比图、逐颗粒标注 CSV 全部生成。
-- 消融表：number→γ=1/2/3 的 D50 单调变化，符合预期。
+## 复用与项目贡献
 
-## 已知问题
+复用：
 
-- 形貌/泥团阈值未用真实骨料标定；67mm 异物在 demo 中被正确检出，但更复杂的泥团场景未验证。
-- 图内文字为英文（DejaVu 无中文字形，避免方块）。
-- `tests/test_imagegrains.py` 仍是占位用例。
-- fit_calibration 需真实筛分数据才有意义，当前仅合成数据验证。
+- ImageGrains 2.0 / Cellpose-SAM 预训练颗粒实例分割模型。
 
-## 使用手册
+本项目贡献：
 
-- `docs/USAGE.md`：竞赛版完整使用手册（环境/模型/两阶段命令/全部参数/输入输出说明/
-  结果解读/校准流程/现场 30 分钟 SOP/常见问题）。上手先读它。
-- 已补充"9. 竞赛口径答疑"：双口径策略（任务字面 vs 评分基准）、d 的来源、γ=3 语义、
-  bootstrap/CI 含义（无需多次拍照）、标准筛分=质量分布、校准实验须赛前自备等。
-- 模型 `models/IG2_full_set_cp_SAM`（1.2GB）已放入项目 models/ 并 gitignore，不进版本库。
+1. 将预训练实例结果接入毫米级物理测量；
+2. 建立显式的筛分等效粒径和质量代理统计；
+3. 集成粒径、投影形貌、异常候选、结果报告和现场质检；
+4. 保留逐颗粒到场景级输出的追溯关系。
 
-## 下一步建议
+不要把 ImageGrains 2.0 或 Cellpose-SAM 表述为本项目提出的方法。
 
-1. 采集骨料图像 + 筛分实验 batch（称重 + 机械筛分 + 拍照）→ `fit_calibration` 校准 θ/γ。
-2. 评估预训练模型在真实骨料上的分割质量。
-3. ArUco/标尺标定模块（现场 30 分钟约束）。
+## 写作规范
 
----
+论文修改前读取：
 
-# 历史交接：官方工作流已跑通（2026-08-16）
+`docs/ai/report-writing-skill/SKILL.md`
 
-## 任务目标
+该 skill 的核心要求：
 
-在自然堆积赛道（`docs/task.md`）上基于 ImageGrains 2.0 构建骨料智能筛分系统。本轮完成环境搭建与官方工作流验证。
+- 先写技术事实和机制，减少“值得注意”“需要指出”“这里强调”等回答者口吻；
+- 减少反复的“不是 X / 不能说明 Y”防御性句式，证据边界集中表达；
+- 结果段按“观察 -> 数据 -> 机制 -> 含义”组织；
+- 方法段按“动机 -> 定义 -> 公式 -> 参数含义 -> 后果”组织；
+- 保持术语、公式、数字、引用和 LaTeX label 稳定；
+- 不为了所谓“去 AI”改变事实、增加口语错误或制造未验证结论。
 
-## 已完成步骤
+## 当前写作状态
 
-- 创建 conda 环境 `imagegrains`（Python 3.10，`conda create --override-channels -c conda-forge`；Anaconda 默认频道需要 ToS，用 override-channels 绕过）。
-- `pip install -e '.[test]'` 安装成功：imagegrains 2.0.3.dev10、cellpose 4.2.1.1、torch 2.13.0（CUDA 版）、pytest 9.1.1。
-- GPU 验证：RTX 4080 SUPER（CUDA 可用）。
-- 模型：`~/imagegrains/models/IG2_full_set_cp_SAM`（1.2GB）。注意：首次 `--download_data True` 下载的模型文件损坏（333MB 截断），已删除并用 `curl -L --retry` 从 zenodo.org/records/15728186 重新下载成功。
-- demo 完整闭环：`python -m imagegrains --img_dir /tmp/ig_in --out_dir /tmp/ig_out --resolution demo_data/FH_resolutions.csv`
-  - 分割：2.8s/张（GPU），输出 `*_pred.tif` mask + composite.png；
-  - 粒径：57 颗粒 → `*_pred_grains.csv`（px）与 `*_pred_grains_re_scaled.csv`（mm，0.39 mm/px）；
-  - GSD：D16=6.3 / D50=9.2 / D84=14.9 / D96=25.2 mm（b 轴、bootstrap、95% CI），含 `GSD_uncertainty/` 完整不确定度。
-- 工作流五步均可独立跳过（`--skip_segmentation` / `--skip_grainsize`），resampling 未在 demo 中使用（比赛场景全量测量）。
+已完成第一轮全文语言优化：摘要、第 1--7 节均已减少模板化路标词、自我辩护和宣传式措辞，并强化问题、方法、结果之间的因果关系。
 
-## 改动文件
+后续工作优先级：
 
-- 本轮无仓库代码改动；验证产物在 `/tmp/ig_in`、`/tmp/ig_out`（临时）。
-- 新增 `opencode.json`（项目级：`permission.edit = allow`，本仓库编辑免询问；需重启 opencode 生效）。
+1. 检查图表是否都在支撑明确论点，删除重复图/表；
+2. 统一全文术语与图注；
+3. 再做一轮逐段压缩，重点检查第 4、5 节；
+4. 编译并检查目录、参考文献、交叉引用、页面断裂和图表位置；
+5. 在论文稳定后制作 PPT / 答辩材料。
 
-## 重要决策
+## 构建检查
 
-- 使用官方预训练模型 `IG2_full_set_cp_SAM` 作为基线；后续评估其在真实骨料上的分割质量再决定是否微调。
-- 比赛统计口径以"质量加权分布 → 标准筛分对照"为准（见 DECISIONS.md），原生 number-based GSD 仅作中间产物。
+每次论文修改后以 GitHub Actions `Paper Build` 为准：
 
-## 已运行验证
-
-- `pytest tests/`：1 passed（占位测试）。
-- `python -m imagegrains --help`、demo 完整流水线（分割→粒径→尺度→GSD+不确定度）输出全部符合预期。
-
-## 已知问题
-
-- `tests/test_imagegrains.py` 只有占位用例，尚无真测试。
-- 模型下载不可靠（首次损坏），后续需要记录 Zenodo 直接下载方式或做文件完整性校验。
-- CLI 默认模型路径是 `~/imagegrains/models/`；`models/` 仓库目录内是 Cellpose 2 旧模型（`.170223`），与 cellpose 4.x 不兼容，不能直接用于 SAM 推理。
-
-## 下一步建议
-
-1. 采集真实骨料图像（或自制小批次），用 `IG2_full_set_cp_SAM` 评估分割质量（漏分/粘连/误检）。
-2. 建立 mm 尺度标定（ArUco/标尺），替代 demo 的固定 resolution CSV。
-3. 实现筛分等效粒径 + 质量加权分布模块（`docs/ai/PLAN.md` P0）。
-4. 制作筛分对照实验 batch（称重 + 机械筛分 + 拍照）。
+- 无 unresolved reference/citation；
+- 无明显 overfull box；
+- 正文保持正式报告结构；
+- artifact 为 `technical-report-pdf`。

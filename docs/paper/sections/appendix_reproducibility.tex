@@ -1,0 +1,110 @@
+% ===== 附录：复现、参数与输出 =====
+\clearpage
+\appendix
+
+\section{软件环境与复现流程}
+\label{app:reproducibility}
+
+当前仓库要求 Python $\geq3.9$，推荐使用 Python 3.10；主要依赖包括 Cellpose $\geq4.0.1$、PyTorch、scikit-image、NumPy、Pandas、SciPy 和 Matplotlib。竞赛层筛分、形貌、异常与报告模块可以在不加载分割模型的条件下独立测试；完整实例分割需要预训练 Cellpose-SAM 模型权重，现场部署推荐使用 CUDA GPU。
+
+在模型权重和环境已经准备好的情况下，三张演示样本可按以下流程复现：
+\begin{lstlisting}[language=bash,caption={从图像到筛分报告的最小复现流程。}]
+# 仓库根目录
+python -m imagegrains \
+  --img_dir demo_data/samples \
+  --model_dir models \
+  --out_dir demo_data/samples/demo \
+  --resolution 0.208 \
+  --gpu True
+
+for f in demo_data/samples/demo/*_re_scaled.csv; do
+  python -m aggregate_screening \
+    --grains "$f" \
+    --out_dir demo_data/samples/demo/report
+done
+\end{lstlisting}
+
+上述命令中的 \texttt{0.208}~mm/px 仅用于复现当前已提交演示结果；新的现场图像必须由本次成像条件重新完成尺度标定。正式竞赛使用的 $\boldsymbol{\theta}$ 和 $\gamma$ 也应替换为赛前配对机械筛分校准后冻结的参数，而不是把演示默认值当作通用常数。
+
+竞赛层软件逻辑可通过以下命令进行快速自检：
+\begin{lstlisting}[language=bash,caption={竞赛层合成单元测试。}]
+pytest tests/test_sieve_equivalent.py -v
+pytest tests/test_morphology.py -v
+pytest tests/test_anomaly.py -v
+pytest tests/test_report.py -v
+\end{lstlisting}
+
+这些测试验证实现逻辑，不替代真实图像实例标注或机械筛分 ground truth。
+
+\section{核心参数与冻结原则}
+\label{app:parameters}
+
+表\ref{tab:appendix-parameters}汇总与现场结果直接相关的核心参数。参数按来源可以分为三类：由现场物理标定确定的尺度参数，由赛前物理校准确定的筛分语义参数，以及由开发数据确定的视觉/规则参数。正式测试时应冻结后两类参数，只允许针对本次场景重新测量物理尺度。
+
+\begin{table}[htbp]
+\centering
+\caption{核心参数、来源与正式测试时的处理原则。}
+\label{tab:appendix-parameters}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{3.5cm}}
+\toprule
+参数 & 当前演示值/形式 & 来源 & 正式测试原则 \\
+\midrule
+resolution $r$ & 0.208~mm/px（演示） & 本次成像尺度标定 & 每次设备几何变化后重新测量 \\
+$\theta_1,\theta_2,\theta_3$ & $(1,0,0)$（未校准基线） & 配对机械筛分校准 & 赛前拟合并冻结 \\
+$\gamma$ & 3（体积先验基线） & 配对机械筛分校准 & 赛前拟合并冻结 \\
+Cellpose-SAM 模型 & \texttt{IG2\_full\_set\_cp\_SAM} & ImageGrains 2.0 预训练模型 & 比赛前固定版本 \\
+实例分割配置 & 当前仓库固定配置 & 开发/人工实例验证 & 测试时原则上冻结 \\
+形貌阈值 & \texttt{MorphThresholds} & 开发数据/人工标签 & 有独立标签后校准并冻结 \\
+泥团几何阈值 & 40--50~mm + solidity & 当前启发式规则 & 仅作疑似筛查，不作为已验证语义分类 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+任何参数更新都应与其对应证据绑定。例如，若改变 $\gamma$，应记录使用了哪些校准批次以及独立测试误差如何变化；若改变实例分割配置，应重新检查人工实例标注上的 merge/split；若改变形貌阈值，应重新计算独立形貌标签上的混淆矩阵。这样可以避免参数在项目迭代中失去可追溯来源。
+
+\section{主要输出文件与赛题任务映射}
+\label{app:outputs}
+
+系统的输出不是单一最终图片，而是一组从原始实例到场景报告的分层证据。表\ref{tab:appendix-outputs}给出主要文件与用途。文件名可能随场景 id 改变，但后缀和语义保持一致。
+
+\begin{table}[htbp]
+\centering
+\caption{主要输出文件、信息层级及其赛题用途。}
+\label{tab:appendix-outputs}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+输出 & 内容 & 用途 \\
+\midrule
+\texttt{*\_pred.tif} & 每个颗粒独立实例 id 的 mask & 精细识别、实例数量、人工复核 \\
+\texttt{*\_composite.png} / \texttt{*\_detection\_overview.png} & 原图与实例边界/标注叠加 & 快速发现 merge、split、漏检 \\
+\texttt{*\_pred\_grains.csv} & 像素级面积、轴长、周长等 & 几何测量中间证据 \\
+\texttt{*\_re\_scaled.csv} & 加入毫米轴长的逐颗粒表 & 粒径分析、尺度追溯 \\
+\texttt{*\_particles\_annotated.csv} & $d_i$、形貌和异常标签等 & 单颗粒级结果追溯 \\
+\texttt{*\_summary.json} & resolution、参数、$D_p$、粒级、形貌、异常汇总 & 场景级机器可读报告 \\
+\texttt{*\_gsd\_comparison.png} & 数量型与质量代理级配图 & 解释统计口径差异 \\
+\texttt{*\_axes\_overlay.png} & 颗粒长短轴和尺度叠加 & 物理尺寸目检 \\
+\texttt{*\_shape\_*.png} & 各投影形貌类别高亮 & 形貌结果展示与人工核验 \\
+\texttt{*\_anomaly\_*.png} & 异常类别高亮 & 大块/过小/疑似异常定位 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+正式物理验证还应在上述输出之外增加每个物理批次的机械筛分原始记录文件，至少包含批次 id、总质量、各筛上质量、累计通过率和试验日期。视觉 summary 与机械筛分记录通过同一 batch id 关联后，才形成完整的“图像--实例--预测级配--标准筛分真值”证据链。
+
+\section{提交前复核清单}
+\label{app:submission-checklist}
+
+正式提交前建议逐项完成以下检查：
+\begin{enumerate}[leftmargin=2em]
+  \item 报告、PPT、图像和软件输出中不包含学校、导师、实验室 logo 等匿名要求禁止的信息；
+  \item 最终使用的模型版本、resolution、$\boldsymbol{\theta}$、$\gamma$ 与报告中描述一致；
+  \item 机械筛分校准批次与独立测试批次没有物理批次泄漏；
+  \item 关键结果表中的数字能够从保存的 JSON/CSV 或原始称量记录重新计算；
+  \item 对实例精度、筛分精度、形貌精度和异常精度分别使用匹配的 ground truth，不以合成测试替代现实验证；
+  \item 现场至少完整演练一次从设备摆放到最终结果导出的 30~min SOP，并记录真实 wall-clock time；
+  \item 对当前仍未验证的能力使用“候选”“疑似”“代理”“待独立验证”等准确措辞，避免将设计假设写成实验结论。
+\end{enumerate}

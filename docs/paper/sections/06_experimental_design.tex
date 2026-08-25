@@ -1,0 +1,147 @@
+% ===== 6 实验设计 =====
+\section{实验设计}
+\label{sec:experimental-design}
+
+前五章已经给出了从图像到实例、从实例到物理几何、再从视觉几何到质量级配以及形貌/异常标签的完整方法链。然而，\emph{处理链能够运行}与\emph{处理结果足够准确}是两个不同命题：前者可以通过演示样本和软件测试证明，后者必须依赖与各项输出相互独立的 ground truth。本章因此不直接报告结果，而是先规定每一项核心 claim 应由什么数据、什么真值和什么指标验证，并明确参数开发、物理校准和最终测试之间的数据边界。
+
+\subsection{实验数据与证据层次}
+\label{sec:dataset-design}
+
+当前仓库中的 \texttt{demo\_data/samples} 提交了 \texttt{agg\_001}、\texttt{agg\_005} 和 \texttt{agg\_029} 三张自然堆积骨料图像及其完整推理产物。三者在当前默认参数下分别得到不同的颗粒数量与级配形态，可用于检查实例分割、几何测量、数量/质量统计差异、形貌规则、异常规则以及自动化报告是否能够形成完整闭环。这组数据在本文中定义为\textbf{功能演示集（demonstration set）}，其作用是验证软件链路和展示典型输出，而不用于单独声明标准筛分准确率。
+
+最终精度实验需要在功能演示集之外建立\textbf{配对物理验证集}。基本采样单位应是“骨料批次”而不是单张图像：对同一批材料先完成受控图像采集，再对同批材料进行标准机械筛分，并保存原始各筛质量。不同批次应尽量覆盖细粒占比较高、连续级配、粗粒占比较高以及含少量超限颗粒等不同组成，使校准参数不只由单一种级配决定。若同一物理批次拍摄多张图像，这些图像在数据划分时必须始终属于同一子集，避免同一材料同时出现在校准集和测试集中造成批次级信息泄漏。
+
+本文将实验数据按用途而非随机图片比例划分为三个逻辑层次。\textbf{开发数据}用于确定成像流程、分割固定配置以及形貌/异常规则的初始阈值；\textbf{校准批次}仅用于第\ref{sec:sieve-calibration}节的 $\boldsymbol{\theta},\gamma$ 拟合；\textbf{独立测试批次}在所有参数冻结后才用于报告最终性能。若可获得批次数量较少，可采用按批次的交叉验证提高数据利用率，但任何一次测试中的目标批次都不得参与对应参数拟合。表\ref{tab:data-roles}给出了各类数据的职责边界。
+
+\begin{table}[htbp]
+\centering
+\caption{实验数据的角色划分与可支持结论}
+\label{tab:data-roles}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+数据角色 & 当前/计划来源 & 允许用于 & 不允许单独用于 \\
+\midrule
+功能演示集 & 当前 3 张仓库样本及推理产物 & 流程复现、输出展示、模型行为 sanity check & 声称机械筛分准确率、形貌分类准确率 \\
+开发数据 & 自采图像与部分人工标注 & 固定成像、分割参数、规则阈值 & 最终无偏性能报告 \\
+筛分校准批次 & 同批图像 + 机械筛分真值 & 拟合 $\boldsymbol{\theta},\gamma$ & 作为校准后最终测试结果 \\
+独立测试批次 & 参数冻结后的同批图像 + 独立真值 & 最终准确率、误差分析、消融比较 & 再次调节模型或阈值 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这种按证据角色划分数据的方式与本文模块化设计一致：上游实例感知、物理尺度、筛分级配和形貌异常分别拥有自己的验证对象，而不是让一个“看起来合理”的场景级结果替代所有中间环节的真实性检查。下一节进一步规定各任务所需要的 ground truth 获取方式。
+
+\subsection{Ground Truth 获取与配对协议}
+\label{sec:ground-truth}
+
+\textbf{实例分割真值。} 为评价 Cellpose-SAM 是否真正分开接触颗粒，应从开发/测试图像中抽取具有代表性的区域或整图，由人工逐实例描绘掩膜。标注时重点核对颗粒接触处的分界，并为被图像边缘截断或严重遮挡、无法确定完整轮廓的实例设置明确的忽略规则。若资源允许，可由两名标注者对困难区域交叉复核，以减少把主观边界差异误计为模型错误。该真值只评价 $I\rightarrow M_i$，不依赖后续粒径模型。
+
+\textbf{尺度与几何真值。} 像素到毫米的尺度恢复应使用已知长度参考物单独验证。标尺或标记物应尽量覆盖画面不同位置，以检查单一 mm/px 假设是否存在明显空间偏差。对于一小批可单独取出的颗粒，还可以使用游标卡尺或其他物理测量获得可比较的长、短尺寸，用于隔离评价“实例轮廓$\rightarrow$二维几何量”这一环节。需要强调的是，卡尺短轴本身仍不等同于机械筛分等效粒径，因此这类测量用于诊断几何误差，而不是替代批次级筛分真值。
+
+\textbf{标准筛分真值。} 粒径级配是本报告最重要的物理验证对象。对每个配对批次，图像采集完成后按照比赛采用的标准筛分规程对同批材料进行机械筛分，并记录每一级筛上质量，而不是只记录最终的 $D_{10}/D_{50}/D_{90}$。由原始质量可以计算累计通过率、各筛级质量占比以及特征粒径，从而既支持第\ref{sec:sieve-calibration}节的参数拟合，也支持在独立测试批次上对完整级配曲线进行检验。配对协议的核心是“同一批材料、两条独立测量路径”，如图\ref{fig:paired-ground-truth}所示。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm and 1.1cm,
+  block/.style={rectangle, draw, rounded corners, minimum height=0.95cm, minimum width=3.0cm, align=center, font=\small},
+  arrow/.style={->, thick}
+]
+\node[block, fill=gray!8] (batch) {同一物理骨料批次};
+\node[block, fill=blue!7, below left=0.9cm and 1.0cm of batch] (camera) {视觉路径\\拍摄$\rightarrow$模型$\rightarrow\widehat{Y}$};
+\node[block, fill=yellow!10, below right=0.9cm and 1.0cm of batch] (sieve) {物理路径\\标准筛分$\rightarrow Y^{\mathrm{GT}}$};
+\node[block, fill=green!7, below=1.0cm of batch, yshift=-1.8cm] (compare) {批次级比较\\$\widehat{Y}\leftrightarrow Y^{\mathrm{GT}}$};
+\draw[arrow] (batch) -- (camera);
+\draw[arrow] (batch) -- (sieve);
+\draw[arrow] (camera) -- (compare);
+\draw[arrow] (sieve) -- (compare);
+\end{tikzpicture}
+\caption{粒径级配的配对 ground-truth 协议。同一批材料分别经过视觉预测和标准机械筛分，两条路径在产生结果前相互独立，仅在批次级进行比较。}
+\label{fig:paired-ground-truth}
+\end{figure}
+
+\textbf{形貌与异常真值。} 对投影形貌，应在测试颗粒 crop 上提供独立人工标签，并明确标签评价的是“二维投影形貌”还是规范意义下需要第三维尺寸的真实针片状。若需要评价后者，应增加量规、卡尺或三维测量作为物理参考。异常检测则应建立含正常骨料、已知 $>50$~mm 目标、泥团以及其他常见非骨料物的测试集；其中尺寸超限可由物理尺寸确认，泥团和异物应由人工材质标签确认，不能以当前几何规则本身作为 ground truth。
+
+通过上述协议，实例、尺度、几何、级配、形貌和异常的真值彼此独立且与各自测量对象匹配。下一节据此定义评价指标，使后续结果章节中的每一个数字都能对应明确的物理或视觉含义。
+
+\subsection{评价指标}
+\label{sec:evaluation-metrics}
+
+\textbf{实例识别。} 对人工实例掩膜，首先基于交并比（Intersection over Union, IoU）匹配预测与真实实例，并报告实例 Precision、Recall 和 F1；同时统计典型的 merge 与 split 错误数量。前者描述“是否找到正确实例”，后两类错误则直接对应后续粒径偏粗和偏细的主要传播机制。必要时可补充不同 IoU 阈值下的 AP，但本文优先使用便于解释和现场复核的实例级指标。
+
+\textbf{尺度与单颗粒几何。} 对已知长度 $L_j^{\mathrm{GT}}$ 与预测长度 $\widehat{L}_j$，报告平均绝对误差和平均绝对百分比误差（MAPE）：
+\begin{equation}
+ \mathrm{MAPE}_{L}=\frac{100\%}{n}\sum_{j=1}^{n}
+ \frac{|\widehat{L}_j-L_j^{\mathrm{GT}}|}{\max(L_j^{\mathrm{GT}},\epsilon)}.
+ \label{eq:metric-length-mape}
+\end{equation}
+该指标用于量化尺度和二维测量误差，而不直接作为最终筛分得分。
+
+\textbf{级配准确性。} 对 $p\in\{10,50,90\}$，分别报告绝对误差与相对误差
+\begin{equation}
+ E_{D_p}^{\mathrm{abs}}=|\widehat{D}_p-D_p^{\mathrm{GT}}|,
+ \qquad
+ E_{D_p}^{\mathrm{rel}}=
+ \frac{|\widehat{D}_p-D_p^{\mathrm{GT}}|}{D_p^{\mathrm{GT}}}.
+ \label{eq:metric-d-error}
+\end{equation}
+仅比较三个分位点仍可能遗漏局部级配形状，因此还在标准筛孔 $s_j$ 处比较预测累计通过率 $\widehat{F}(s_j)$ 与机械筛分累计通过率 $F^{\mathrm{GT}}(s_j)$，定义
+\begin{equation}
+ \mathrm{MAE}_{\mathrm{sieve}}
+ =\frac{100}{J}\sum_{j=1}^{J}
+ |\widehat{F}(s_j)-F^{\mathrm{GT}}(s_j)|,
+ \label{eq:metric-sieve-mae}
+\end{equation}
+单位为百分点。除此之外，报告各区间质量占比 $P_k$ 的逐级误差，重点检查预测主粒级是否与机械筛分一致。这样可以避免只优化 $D_{10}/D_{50}/D_{90}$ 而忽视两者之间曲线形状的情况。
+
+\textbf{形貌与异常。} 四类投影形貌使用混淆矩阵、每类 Precision/Recall/F1 和 Macro-F1，使样本数量较少的类别不会被“普通”类数量优势掩盖。异常检测分别报告大块超限和泥团/非骨料的 Precision、Recall 与 F1，而不是只报告总体 accuracy；对于现场质量控制，漏掉异常与误报异常的工程代价不同，因此结果分析还应分别讨论 false negative 与 false positive 的来源。
+
+\textbf{工程性能。} 时间指标采用从现场设备准备、尺度校验、图像采集、实例推理、几何/筛分分析到报告输出的完整 wall-clock time，并同时列出各阶段耗时。单纯报告 GPU forward time 只能说明算法计算成本，不能证明满足比赛的完整现场时间限制。对于重复运行，还应记录平均值和波动范围，以识别模型初始化、磁盘 I/O 或人工质检等可能成为实际瓶颈的环节。
+
+表\ref{tab:claim-evidence-metric}将全文主要 claim 与独立证据、评价指标对应起来，这也是后续结果章节的基本组织顺序。
+
+\begin{table}[htbp]
+\centering
+\caption{核心 claim、ground truth 与评价指标对应关系}
+\label{tab:claim-evidence-metric}
+\footnotesize
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{4.1cm}>{\raggedright\arraybackslash}p{6.2cm}}
+\toprule
+待验证 claim & 独立证据 & 主要指标 \\
+\midrule
+能够分离自然堆积颗粒 & 人工实例 mask & IoU 匹配、Precision、Recall、F1、merge/split \\
+毫米尺度与二维几何可信 & 已知标尺、部分颗粒物理测量 & MAE、MAPE、位置相关尺度误差 \\
+能够逼近标准筛分级配 & 同批次机械筛分原始质量 & $D_{10}/D_{50}/D_{90}$ 误差、$\mathrm{MAE}_{\mathrm{sieve}}$、各 $P_k$ 误差 \\
+投影形貌规则有效 & 独立人工/专家标签 & Confusion matrix、Macro-F1 \\
+尺寸/语义异常可识别 & 已知异常物与人工材质标签 & 各异常类 Precision、Recall、F1 \\
+满足现场部署约束 & 完整流程实测计时 & 总 wall-clock time、阶段耗时与重复波动 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{对照与消融实验}
+\label{sec:ablation-design}
+
+最终系统由多个连续假设组成，因此仅报告一个“完整方法”结果无法判断性能来源。本文优先设计与代码现有开关和参数直接对应的消融，使每一组比较都回答一个明确问题，并在相同的独立测试批次上执行。
+
+\textbf{粒径表征消融}用于回答“为什么以短轴为主，而不是直接使用投影面积尺度”。至少比较：仅短轴 $d=b$（$\boldsymbol{\theta}=(1,0,0)$）、仅面积等效直径 $d=d_{\mathrm{eq}}$（$\boldsymbol{\theta}=(0,1,0)$）以及校准后的混合模型 $d(\widehat{\boldsymbol{\theta}})$。评价对象不是三个方法彼此之间的数值差异，而是它们各自相对于机械筛分真值的 $D_p$ 和完整筛孔曲线误差。
+
+\textbf{质量模型消融}用于回答“数量统计为什么不能直接替代质量筛分”。首先报告不加质量权重的数量型分布作为对照，再在固定粒径模型下比较若干 $\gamma$ 值（例如 1、2、3）以及由校准集得到的 $\widehat{\gamma}$。如果 $\gamma=3$ 只是使 $D_{50}$ 向右移动但并未降低机械筛分误差，则不能将“符合体积直觉”解释为“更准确”；只有独立真值误差下降才能证明质量模型选择有效。
+
+\textbf{参数校准消融}比较默认 $(\boldsymbol{\theta}_0,\gamma_0)$ 与通过校准批次拟合后的 $(\widehat{\boldsymbol{\theta}},\widehat{\gamma})$。两者必须使用完全相同的测试批次和上游实例结果，从而把性能变化归因于筛分语义校准，而不是数据或分割差异。同时独立检查未进入损失函数的筛级占比误差，以防校准只改善三个目标分位点。
+
+\textbf{异常处理消融}比较“所有实例参与级配”和“仅剔除经确认的异常实例”两种口径，并分别报告对 $D_p$ 和各筛级质量占比的影响。由于 $d^\gamma$ 会放大粗粒权重，该实验特别关注单个 oversized 实例、错误 merge 或疑似泥团是否会不成比例地改变场景级结果。几何规则产生的“疑似泥团”不应默认全部剔除，除非有独立标签证明其确为异常。
+
+若时间和标注资源允许，还可以增加实例感知基线，例如与传统分水岭或其他现成分割模型比较接触颗粒的 merge/split 错误。但这类对照属于上游视觉模型选择的辅助证据，优先级低于与比赛最终标准筛分真值直接相关的粒径、质量权重和校准消融。
+
+\subsection{工程性能与鲁棒性测试}
+\label{sec:engineering-evaluation}
+
+工程性能测试在固定软硬件配置、固定输入分辨率和固定模型参数下进行，并将完整流程划分为设备布置/尺度校验、图像采集、实例分割、几何测量、筛分与形貌异常分析、结果质检与导出等阶段。每一阶段记录 wall-clock time，最终以总时间是否满足赛题现场窗口为判据。GPU 推理时间可以作为算法优化参考，但不单独承担“满足 30~min 要求”的结论。
+
+鲁棒性测试围绕第\ref{sec:problem-challenges}节提出的主要误差源设计，而不是随机增加扰动。优先考察三类因素：一是尺度分辨率变化对小颗粒检出与粒径误差的影响；二是不同程度的接触/遮挡对 merge、split 及最终级配的影响；三是照明均匀性与阴影变化对实例边界的影响。若无法为每类因素构建足够样本进行统计检验，则应将结果明确标为定性失败分析，而不报告缺乏样本支撑的“鲁棒率”。
+
+仓库中的单元测试用于验证筛分等效粒径、质量权重、形貌规则、异常规则和报告生成等代码行为是否符合预期，这对于保证复现性十分重要；但合成单元测试证明的是\emph{实现正确性}，不能替代人工实例标注或机械筛分对\emph{现实准确性}的验证。后续第\ref{sec:results}章将严格按照本章定义的证据等级组织结果：先报告已有功能演示和可复现性，再在 ground truth 完备后报告独立精度，并将尚未完成的证据缺口与方法局限明确区分。

@@ -1,0 +1,65 @@
+% !TeX program = xelatex
+% 混凝土骨料颗粒智能筛分比拼 — 评委阅读版（约20页目标）
+% 编译: latexmk -xelatex main_submission.tex
+
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+
+\usepackage[a4paper,top=2.05cm,bottom=2.05cm,left=2.15cm,right=2.15cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{array}
+\usepackage[section]{placeins}
+
+\captionsetup{font=footnotesize,labelfont=bf,width=0.94\linewidth,justification=raggedright,singlelinecheck=false}
+\graphicspath{{figures/}{../../demo_data/samples/results/}{../../demo_data/samples/}{../assets/}}
+\setlist{nosep,leftmargin=1.8em}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\setlength{\abovedisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\emergencystretch}{8em}
+\sloppy
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black,
+  pdftitle={混凝土骨料颗粒智能筛分技术报告：评委阅读版},
+  pdfauthor={匿名},
+  breaklinks=true
+}
+
+\title{\vspace{-1.2cm}\bfseries 混凝土骨料颗粒智能筛分技术报告\\[0.25em]
+\large 自然堆积赛道：基于实例感知与质量级配映射的视觉筛分方法}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+\input{reviewer/00_abstract}
+\input{reviewer/01_problem}
+\input{reviewer/02_framework}
+\input{reviewer/03_visual_measurement}
+\input{reviewer/04_sieve_mapping}
+\input{reviewer/05_experiments_results}
+\input{reviewer/06_deployment_limits}
+\input{reviewer/07_conclusion}
+
+\bibliographystyle{gbt7714-numeric}
+\bibliography{refs}
+
+\end{document}

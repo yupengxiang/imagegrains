@@ -1,28 +1,39 @@
 # AI 跟进任务
 
-TODO 项不是自动的实施许可；实施前需用户或当前任务显式选择。
+TODO 项不是自动实施许可；实施前需用户或当前任务显式选择。
 
 ## 已落地（2026-08）
 
-- [x] 竞赛工程层 MVP + 代码重构 `9435f9b`（`_columns`/`SieveAnalysis`/`SceneSummary`，27 passed）
-- [x] 使用手册 `docs/USAGE.md` 瘦身至 ~270 行并对齐新 API（`load_grains_csv`/`infer_resolution`/`CalibrationResult`）
-- [x] `docs/architecture.md`/`data-flow.md` 四步链 + `_columns`/`scipy`，`Readme` 竞赛横幅
-- [x] `docs/ai/*` 收束过时断言，`docs/ai` 明确仅面向 agent
-- [x] 模型 `models/IG2_full_set_cp_SAM`（Zenodo 1.2 GB，gitignored）
+- [x] 竞赛工程层 MVP + 代码重构（`_columns`/`SieveAnalysis`/`SceneSummary`，27 passed）
+- [x] 三张自然堆积真实样本的端到端演示输出
+- [x] 正式技术报告收敛为唯一入口 `docs/paper/main.tex`
+- [x] 删除旧 `main_submission.tex` / `main_v2.tex`，CI 只编译 `main.tex`
+- [x] 报告采用“现有证据即最终证据集”的终稿定位
+- [x] 新增 `docs/ai/report-writing-skill/SKILL.md`
+- [x] 第一轮全文去模板化/去防御性语言优化
 
-## 依赖真实数据/硬件（P0）
+## 当前 P0：论文定稿
 
-- [ ] 采批料筛分实验校准 θ/γ（当前经验基线，评分误差主因）
-- [ ] 评估真实分割质量（漏分/粘连/误检），定是否微调
-- [ ] ArUco/标尺标定 + homography 透视校正
+- [ ] 逐图检查：每张图是否支撑明确论点，是否存在重复信息
+- [ ] 逐表检查：表头、单位、统计口径、正文引用是否一致
+- [ ] 全文术语统一：实例分割 / 筛分等效粒径 / 质量代理级配 / 投影形貌 / 异常候选
+- [ ] 第 4 节方法核心再做一轮逻辑压缩
+- [ ] 第 5 节结果章再做一轮“数据 -> 机制 -> 含义”审校
+- [ ] 最终 PDF 版式检查：目录、参考文献、分页、图表漂移、overfull box
 
-## P1
+## 当前 P1：提交材料
 
-- [ ] 泥团分类器（颜色/纹理，当前尺寸+凸度兜底）
-- [ ] 形貌阈值重标定（`MorphThresholds`）
-- [ ] 一键图形界面/自动 QC（现场 30 分钟）
+- [ ] 基于正式报告制作答辩 PPT
+- [ ] 整理核心代码框架、设备配置和支持材料
+- [ ] 统一论文、PPT 与现场演示中的参数和术语
 
-## 工程卫生
+## 不纳入当前提交阶段的工程扩展
 
-- [ ] 补 `tests/test_imagegrains.py` 真实用例
-- [ ] 分割质量评估脚本
+以下工作保留为代码/研究扩展方向，但用户已决定本轮不再为报告新增实际采样或机械筛分实验：
+
+- 机械筛分数据校准 theta/gamma
+- 人工实例 mask 精度评估与分割微调
+- ArUco/homography 自动尺度校正
+- 泥团颜色/纹理分类器
+- 三维形貌测量
+- 一键图形界面/自动 QC

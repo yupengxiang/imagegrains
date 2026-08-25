@@ -6,15 +6,29 @@
 
 当前阶段不再安排新的机械筛分、人工实例标注或现场采样实验。报告必须基于现有证据完成闭环，不保留“待补真值”“后续回填实验表”等中期稿叙事。
 
-## 唯一论文入口
+## 唯一论文入口与章节树
 
 - 正式报告：`docs/paper/main.tex`
+- 正文、摘要与附录：`docs/paper/sections/`
 - `docs/paper/main_submission.tex`：已删除
 - `docs/paper/main_v2.tex`：已删除
+- `docs/paper/reviewer/`：已删除
 - CI：`.github/workflows/paper-build.yml` 只编译 `docs/paper/main.tex`
 - PDF artifact：`technical-report-pdf`
 
-正文由 `docs/paper/reviewer/` 下的 7 个章节、参考文献和附录组成。
+`sections/` 是唯一章节源，只保留 `main.tex` 当前实际引用的 9 个文件：
+
+- `00_abstract.tex`
+- `01_problem.tex`
+- `02_framework.tex`
+- `03_visual_measurement.tex`
+- `04_sieve_mapping.tex`
+- `05_results.tex`
+- `06_deployment.tex`
+- `07_conclusion.tex`
+- `08_appendix.tex`
+
+不再保留历史章节、`*_final.tex` 副本或平行稿件树。每个章节文件首行使用 `% !TeX root = ../main.tex`，便于 VS Code / LaTeX Workshop 正确识别根文档。
 
 ## 当前论文结构
 
@@ -119,13 +133,13 @@
 6. 清理附录中的编辑过程语言；
 7. 将结论独立起页，消除章节页眉与上一节共享页面造成的归属错觉。
 
-第二轮最终正文构建为 17 页。最终 PDF 已逐页渲染检查，章节、图表、参考文献和附录的分页关系正常。
+第二轮最终正文构建为 17 页。随后完成章节树重构：当前正式内容已从旧 `reviewer/` 与早期 `sections/` 双树合并为唯一的 `sections/` 章节树，旧稿和 `_final` 副本均已删除。重构后的 `main.tex` 已通过 GitHub Actions 完整编译，保持 17 页，且无 unresolved reference/citation 与 Overfull box。
 
 除事实纠错、赛题要求变化或答辩材料需要联动外，不建议继续对正文做大范围改写。下一阶段优先制作 PPT / 答辩材料，并从论文中抽取“问题 -> 技术选择 -> 筛分语义映射 -> 结果证据 -> 工程部署 -> 边界”的主线。
 
 ## 最终构建状态
 
-GitHub Actions `Paper Build` 已确认：
+GitHub Actions `Paper Build` 已确认章节树重构后的正式版本：
 
 - 17 页；
 - XeLaTeX/BibTeX 编译成功；
@@ -133,4 +147,4 @@ GitHub Actions `Paper Build` 已确认：
 - 无 Overfull box；
 - artifact 名称为 `technical-report-pdf`。
 
-最终分页版本对应正文提交 `72ec2665`；之后的 README/HANDOFF 更新不改变论文内容。
+章节树重构验证对应 run `32873626864`。后续 README、AGENTS 与本 HANDOFF 的路径说明更新不改变论文正文内容。

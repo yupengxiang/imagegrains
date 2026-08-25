@@ -2,31 +2,76 @@
 \section{视觉感知与物理测量}
 \label{sec:r-visual}
 
-\subsection{成像与尺度标定}
+\subsection{成像条件与尺度标定}
 
 上游视觉模块的目标不是获得“好看的照片”，而是稳定恢复颗粒边界并把像素几何转换为毫米几何。现场采用固定俯视相机、低反光背景和漫射照明，优先降低硬阴影、运动模糊与透视缩放差异。相机高度或焦距改变后必须重新标定尺度；若参考长度 $L_{\mathrm{ref}}$ 在图像中占据 $l_{\mathrm{ref}}$ 像素，则
 \begin{equation}
  r=\frac{L_{\mathrm{ref}}}{l_{\mathrm{ref}}}\quad (\mathrm{mm/px}).
 \label{eq:r-scale}
 \end{equation}
-所有轴长由像素量乘以 $r$ 得到。尺度误差近似按比例传递到长短轴和筛分粒径，因此它是场景级系统误差，而不是可以由下游统计自动抵消的噪声。参考物应尽量与测量面共面；若画面不同位置得到的 $r$ 差异明显，则说明单一 mm/px 已不足以描述透视，应先调整相机姿态或加入平面单应/镜头畸变校正。
+所有轴长由像素量乘以 $r$ 得到，面积按 $r^2$ 转换。若忽略下游映射参数本身的变化，尺度相对误差的一阶传播近似满足
+\begin{equation}
+\frac{\Delta a}{a}\simeq\frac{\Delta b}{b}\simeq\frac{\Delta d_{\mathrm{eq}}}{d_{\mathrm{eq}}}\simeq\frac{\Delta r}{r}.
+\label{eq:r-scale-propagation}
+\end{equation}
+因此尺度错误是场景级系统偏差，而不是可以靠大量颗粒平均掉的随机噪声。若 $r$ 整体偏大，几乎全部颗粒会同时向更粗筛级移动；这也是为什么像素到毫米的成像标定必须发生在筛分语义参数校准之前。
+
+参考物应尽量与骨料测量面共面；若同一图像不同位置得到的 $r_j$ 离散明显，则说明单一 mm/px 已不足以描述透视，应先调整相机姿态或加入平面单应/镜头畸变校正。对于赛题 5--40~mm 主粒级，另一个直接约束是 5~mm 颗粒的像素覆盖。若空间分辨率为 $r$，其代表长度约占 $n_{\mathrm{px}}=5/r$ 像素；当前演示的 0.208~mm/px 对应约 24~px。该量级并不是“24 像素即可保证准确”的阈值，而是说明现场选相机高度时应先确认最小目标仍有足够边界采样，再讨论实例模型参数。
+
+\begin{table}[t]
+\centering
+\caption{成像环节中应优先控制的条件及其下游影响。}
+\label{tab:r-imaging-controls}
+\footnotesize
+\renewcommand{\arraystretch}{1.13}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+条件 & 现场检查 & 若失控的主要后果 \\
+\midrule
+相机姿态/高度 & 光轴尽量垂直测量面；支架锁紧 & 位置相关尺度差异、同一颗粒在不同区域测量不一致 \\
+尺度参考 & 与测量面共面；已知长度清晰可读 & 全场毫米尺寸系统偏移，进一步改变筛级归属 \\
+空间分辨率 & 5~mm 目标仍有足够像素覆盖 & 小目标轮廓量化误差增大，split/漏检更敏感 \\
+照明 & 漫射、稳定、无大面积硬阴影 & 接触边界被阴影连接，增加 merge 或假边缘 \\
+曝光与清晰度 & 无明显过曝、欠曝或运动模糊 & 轮廓位置不确定，面积/轴长和实例分离同步退化 \\
+视场边界 & 主要测量区域完整入镜 & 被截断颗粒形成偏小几何量，不宜进入主级配统计 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{基于 Cellpose-SAM 的实例感知}
 
 自然堆积骨料需要的是\emph{实例分割}而非单纯前景分割：只有每个颗粒对应独立 mask，长短轴、面积和后续质量权重才有明确对象。本文直接复用 ImageGrains 2.0 提供的 Cellpose-SAM 颗粒预训练模型作为感知基座\cite{mair2026imagegrains2,pachitariu2025cellposeSAM}。其优势在于不要求比赛现场重新建立大规模实例标注；输出为整数实例 mask，可继续进行几何测量和人工质检。该预训练模型属于复用的基础能力，本文创新重点不在重新提出分割网络，而在把其实例结果接入物理尺度、筛分等效粒径与质量级配映射。
 
-图\ref{fig:r-demo-detection}给出真实自然堆积样本的实例检测与粒径标注示例。现场质检重点不是逐像素追求视觉完美，而是检查会显著改变级配的结构性错误：整片颗粒被 merge 会产生过大的 $d_i$，单颗粒 split 则制造多个小实例；由于后续质量权重随粒径幂次增长，粗尺度 merge 对最终高分位数尤其敏感。因此正式视觉精度应在人工实例掩膜上同时报告 IoU/F1 与 merge/split，而不能只给一张叠加图。
+图\ref{fig:r-visual-chain}把同一真实样本的原图、实例识别和几何轴线放在一条证据链中。原图提供自然堆积条件；实例叠加图回答“模型把哪些可见区域视为独立颗粒”；轴线图进一步回答“最终毫米粒径是从哪些轮廓和方向测得”。这种逐层可视化对现场质检比单一最终级配图更重要，因为一旦 $D_{50}$ 出现异常，可以向上追溯究竟是尺度量级错误、整片 merge，还是下游统计模型造成。
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.86\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption{真实自然堆积样本的实例检测与粒径标注概览。可视化的主要作用是使最终级配能够回溯到具体实例，并快速发现 merge、split、漏检或明显尺度异常。}
-\label{fig:r-demo-detection}
+\begin{subfigure}{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001.jpg}
+\caption{原始自然堆积图像}
+\end{subfigure}\hfill
+\begin{subfigure}{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
+\caption{实例与粒径概览}
+\end{subfigure}\hfill
+\begin{subfigure}{0.31\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
+\caption{长短轴几何叠加}
+\end{subfigure}
+\caption{从原始图像到可追溯毫米几何量的视觉证据链。三个面板对应“观测场景--实例对象--物理测量”三个层次。}
+\label{fig:r-visual-chain}
 \end{figure}
+
+现场质检重点不是逐像素追求视觉完美，而是检查会显著改变级配的结构性错误：整片颗粒被 merge 会产生过大的 $d_i$，单颗粒 split 则制造多个小实例；由于后续质量权重随粒径幂次增长，粗尺度 merge 对最终高分位数尤其敏感。漏检对结果的方向则依赖缺失颗粒的尺寸结构：如果主要漏掉小颗粒，数量低分位会偏粗；若遮挡导致粗颗粒只保留局部轮廓，则个体尺寸又可能被低估。因此正式视觉精度应在人工实例掩膜上同时报告 Precision/Recall、IoU/F1 与 merge/split，而不能只给一张叠加图。
+
+从比赛工程角度，预训练模型的价值还在于把“现场调参”压缩到可控范围。我们的部署原则是先通过标准化成像减少域偏移，再固定分割模型和主要配置；如果在人工困难样本集上仍发现某类表面、湿度或接触方式稳定失败，才使用本赛题少量标注进行微调。这样避免把测试场景本身变成临时训练集，也使最终误差能够区分为“基础实例感知不足”和“下游筛分语义映射不足”两类。
 
 \subsection{颗粒几何与任务特征}
 
-对实例 mask $M_i$，系统提取面积 $A_i$、周长 $P_i$、凸包面积 $A_{\mathrm{conv},i}$、拟合椭圆长轴 $a_i$ 和短轴 $b_i$。长度经式\eqref{eq:r-scale}转换到毫米，面积按 $r^2$ 转换。面积等效直径定义为
+对实例 mask $M_i$，系统提取面积 $A_i$、周长 $P_i$、凸包面积 $A_{\mathrm{conv},i}$、拟合椭圆长轴 $a_i$ 和短轴 $b_i$。面积等效直径定义为
 \begin{equation}
  d_{\mathrm{eq},i}=2\sqrt{\frac{A_i}{\pi}},
 \label{eq:r-deq}
@@ -38,7 +83,27 @@
  S_i=\frac{A_i}{A_{\mathrm{conv},i}}.
 \label{eq:r-shape}
 \end{equation}
-其中 AR 描述细长程度，$C$ 描述圆度，$S$ 描述相对于凸包的凹凸程度。这些量一方面参与后续筛分粒径映射，另一方面复用于形貌和异常分支，从而避免为每个任务建立彼此独立、难以解释的模型。
+其中 AR 描述投影细长程度，$C$ 描述轮廓相对圆整程度，$S$ 描述相对于凸包的凹凸程度。表\ref{tab:r-features}给出这些特征与下游任务的对应关系。这里的设计原则是尽可能让一个可解释的实例几何量服务多个任务，而不是为粒径、形貌和异常分别建立互不相容的黑箱输出。
+
+\begin{table}[t]
+\centering
+\caption{逐颗粒几何量、物理含义与下游用途。}
+\label{tab:r-features}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\centering\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.4cm}}
+\toprule
+特征 & 含义 & 主要用途 \\
+\midrule
+$a_i,b_i$ & 拟合椭圆长、短轴 / mm & 粒径代理；AR；超限判断；筛分等效粒径主输入 \\
+$A_i$ & 可见投影面积 / mm$^2$ & $d_{\mathrm{eq}}$；规模交叉检查；轮廓异常辅助 \\
+$P_i$ & 投影轮廓周长 / mm & 圆度 $C$，反映边界复杂程度 \\
+$A_{\mathrm{conv},i}$ & 凸包面积 / mm$^2$ & 凸度 $S$，用于凹陷/不规则程度表征 \\
+$d_{\mathrm{eq},i}$ & 与投影面积等价的圆直径 / mm & 与短轴互补，进入可校准筛分粒径映射 \\
+AR, $C$, $S$ & 无量纲投影形貌描述 & 投影形貌规则；疑似异常筛查；后续误差分层分析 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 当前投影形貌规则以 AR、$C$ 和 $S$ 将颗粒划分为针片状候选、圆形、棱角状和普通四类；其中“针片状候选”只描述二维投影细长性，不能替代含厚度维度的规范针片状判定。异常分支以物理粒径和凸度做快速筛查：$d>50$~mm 标记为超限，$d<5$~mm 标记为过小候选，40--50~mm 且低凸度的目标仅标记为疑似泥团。前两类有明确几何定义，而泥团本质上是材质语义问题，因此当前几何规则只承担候选筛查，后续若需要可靠泥团识别，应加入颜色/纹理或小型裁剪分类器。
 

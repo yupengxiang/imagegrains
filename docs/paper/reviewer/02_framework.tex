@@ -2,7 +2,7 @@
 \section{总体框架与技术路线}
 \label{sec:r-framework}
 
-技术路线的选择需要同时满足三项约束：能够分离自然堆积中的接触颗粒；尽量不依赖现场重新标注训练；最终输出必须能够与机械筛分真值建立明确映射。传统阈值/分水岭实现简单，但对背景、阴影和弱接触边界敏感；监督式实例分割可针对赛题训练，却需要代表性实例标注并承担现场域变化风险；多视角或深度方案能恢复更多三维信息，但设备、标定和现场布置复杂度更高。预训练颗粒实例模型则把最依赖大规模视觉数据的“边界识别”交给已有模型，同时允许赛题特有的毫米尺度和筛分口径通过少量物理数据显式校准。因此本文选择 ImageGrains 2.0 / Cellpose-SAM 作为上游基座，而不是从头训练一个端到端网络\cite{stringer2021cellpose,pachitariu2025cellposeSAM,mair2026imagegrains2}。
+技术路线的选择需要同时满足三项约束：能够分离自然堆积中的接触颗粒；尽量不依赖现场重新标注训练；最终输出必须由可解释的物理量和统计规则构成。传统阈值/分水岭实现简单，但对背景、阴影和弱接触边界敏感；监督式实例分割可以针对赛题训练，却需要代表性实例标注并承担现场域变化风险；多视角或深度方案能够恢复更多三维信息，但设备、标定和现场布置复杂度更高。预训练颗粒实例模型则把最依赖大规模视觉数据的“边界识别”交给已有模型，同时允许赛题特有的毫米尺度与级配语义由显式规则完成。因此本文选择 ImageGrains 2.0 / Cellpose-SAM 作为上游基座，而不是从头训练一个端到端网络\cite{stringer2021cellpose,pachitariu2025cellposeSAM,mair2026imagegrains2}。
 
 \begin{table}[t]
 \centering
@@ -17,12 +17,12 @@
 阈值/分水岭 & 强粘连易 merge/split & 低，但参数依赖场景 & 适合作为受控条件基线 \\
 监督式实例分割 & 可学习复杂边界 & 实例标注和训练成本较高 & 有数据时可增强，但不作为现场依赖 \\
 预训练颗粒实例模型 & 直接输出实例轮廓 & 可零样本部署 & 作为主感知基座 \\
-多视角/深度/点云 & 可恢复部分第三维 & 标定、硬件和部署成本高 & 作为后续物理升级方向 \\
+多视角/深度/点云 & 可恢复部分第三维 & 标定、硬件和部署成本高 & 物理信息更丰富，但不采用为当前主路线 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-本文系统采用“在线单向推理 + 离线物理校准”的结构，如图\ref{fig:r-architecture}。在线阶段从图像和尺度参考出发，依次得到实例掩膜、毫米级几何量、筛分等效粒径和质量级配；形貌与异常作为几何特征的并行分支，最终汇总为场景级报告。离线阶段使用与图像同批次的机械筛分结果拟合筛分映射参数 $\boldsymbol{\theta}$ 与质量指数 $\gamma$，校准完成后冻结参数，正式测试时不再根据测试结果临时调节。
+本文系统采用单向、可追溯的数据链，如图\ref{fig:r-architecture}。在线处理从图像和尺度参考出发，依次得到实例掩膜、毫米级几何量、筛分等效粒径和质量代理级配；形貌与异常作为几何特征的并行分支，最终汇总为场景级报告。当前报告使用固定的 $\boldsymbol{\theta}=(1,0,0)$ 和 $\gamma=3$，因此运行时不存在依据输出结果临时调参的闭环。代码层保留了在存在外部机械筛分数据时重新估计 $\boldsymbol{\theta}$ 与 $\gamma$ 的可选接口，但该接口不属于本文现有实验结果。
 
 \begin{figure}[t]
 \centering
@@ -30,27 +30,24 @@
   node distance=0.55cm and 0.42cm,
   block/.style={rectangle,draw,rounded corners,minimum height=0.85cm,minimum width=2.25cm,align=center,font=\footnotesize},
   small/.style={rectangle,draw,rounded corners,minimum height=0.68cm,minimum width=2.0cm,align=center,font=\scriptsize},
-  arr/.style={->,thick}, fb/.style={->,thick,dashed}
+  arr/.style={->,thick}
 ]
 \node[block,fill=blue!7] (img) {图像采集\\尺度参考};
 \node[block,fill=blue!7,right=of img] (seg) {实例感知\\$I\to\{M_i\}$};
 \node[block,fill=green!7,right=of seg] (geo) {物理测量\\$\{M_i\}\to\mathbf{x}_i$};
 \node[block,fill=orange!8,right=of geo] (map) {筛分映射\\$d_i,w_i$};
-\node[small,fill=orange!8,below=0.75cm of map] (grade) {质量级配\\$D_p,P_k$};
+\node[small,fill=orange!8,below=0.75cm of map] (grade) {质量代理级配\\$D_p,P_k$};
 \node[small,fill=purple!7,left=0.45cm of grade] (shape) {投影形貌\\$c_i$};
 \node[small,fill=red!6,right=0.45cm of grade] (anom) {异常候选\\$z_i$};
 \node[block,fill=gray!8,below=0.75cm of grade] (report) {场景级报告\\表格、曲线、可视化};
-\node[small,fill=yellow!12,left=0.75cm of report] (gt) {机械筛分真值\\校准批次};
-\node[small,fill=yellow!12,left=0.55cm of map] (cal) {离线校准\\$\boldsymbol{\theta},\gamma$};
 \draw[arr] (img)--(seg); \draw[arr] (seg)--(geo); \draw[arr] (geo)--(map);
 \draw[arr] (map)--(grade); \draw[arr] (geo.south)|-(shape.west); \draw[arr] (geo.south)|-(anom.west);
 \draw[arr] (shape)--(report); \draw[arr] (grade)--(report); \draw[arr] (anom)--(report);
-\draw[fb] (gt)--(cal); \draw[fb] (cal)--(map);
 \end{tikzpicture}
-\caption{系统主数据流与离线机械筛分校准环。机械筛分真值不参与正式在线推理，只用于赛前确定并冻结筛分语义参数。}
+\caption{本文实际采用的主数据流。上游实例结果统一进入毫米几何表，下游级配、形貌和异常输出共享同一组可追溯颗粒特征。}
 \label{fig:r-architecture}
 \end{figure}
 
-这种拆分体现三个工程原则。\textbf{泛化优先}意味着现场主要依赖预训练实例模型和标准化成像，而不是重新训练；\textbf{校准显式}意味着所有直接决定毫米量和筛分口径的关系都有可追溯参数，便于把误差分解为分割、尺度、粒径映射或质量模型；\textbf{部署可控}意味着在线链只有单目成像、尺度校验和固定配置推理，完整流程可以在 30~min 时间约束内做 wall-clock 验证。与直接从图像回归级配曲线的端到端方式相比\cite{coenen2022learningToSieve,buscombe2020sedinet}，该路线牺牲部分模型自由度，但换取了更强的物理可解释性和小样本校准能力。
+这种拆分体现三个工程原则。\textbf{泛化优先}意味着现场主要依赖预训练实例模型和标准化成像，而不是重新训练；\textbf{映射显式}意味着所有直接决定毫米量和级配口径的关系都有明确公式和固定参数，便于判断误差来自实例、尺度、粒径映射还是质量代理；\textbf{部署可控}意味着主链只有单目成像、尺度校验和固定配置推理，能够把主要现场时间留给质检和失败恢复。与直接从图像回归级配曲线的端到端方式相比\cite{coenen2022learningToSieve,buscombe2020sedinet}，该路线牺牲部分模型自由度，但换取了更强的物理可解释性、逐颗粒可追溯性和较低的现场数据依赖。
 
-后续两节分别讨论上游“图像如何变成可靠毫米几何量”和下游“二维几何如何变成标准筛分质量级配”。这两部分共同决定最终结果是否具有工程意义。
+第 3 节讨论上游“图像如何变成可靠的毫米几何量”，第 4 节进一步说明“二维几何如何转换为筛级和质量代理统计”。这两个层次分别解决观测尺度与统计语义，是从实例识别走向可解释级配输出的关键连接。

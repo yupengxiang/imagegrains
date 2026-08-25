@@ -6,6 +6,29 @@
 
 本任务与一般目标检测的根本区别在于：\textbf{比赛最终评价的是标准筛分语义，而不是图像中目标框或像素本身。} 从一幅自然堆积图像得到标准筛分级配，需要连续跨越三个层次。第一，自然堆积中的粘连、遮挡和阴影使“前景”必须进一步分解为独立颗粒；merge 会制造偏大的伪颗粒，split 会制造偏小实例。第二，像素轮廓必须通过本次成像条件的尺度标定转换为毫米量，否则长短轴和 50~mm 超限阈值没有物理意义。第三，也是最关键的一层，单目图像观察的是二维投影并天然按颗粒个数统计，而机械筛分反映三维颗粒的筛孔通过行为并按质量称重。因此，即使实例边界和毫米尺寸均准确，直接把二维短轴或数量分布当作机械筛分结果仍可能存在系统偏差。
 
+图\ref{fig:r-three-gaps}把这三个问题组织为一条误差传播链。它们不是彼此独立的三个“功能点”：上游实例错误会改变几何量，几何量再经过质量幂次放大后影响场景级分位数。例如，两个相邻颗粒若被 merge 为一个实例，其短轴和面积通常增大；该伪粗颗粒又会在 $d^\gamma$ 权重下获得更大的质量贡献，因此最终偏差可能明显大于普通像素误差本身。相反，一个颗粒被 split 后会形成多个偏细实例，使数量统计和低粒径端同时增加。由此，本文不把实例分割精度、毫米尺度和级配映射分别优化后简单相加，而是始终围绕最终筛分语义检查误差如何向下游传播。
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=0.55cm,
+  stage/.style={rectangle,draw,rounded corners,minimum width=4.0cm,minimum height=1.0cm,align=center,font=\footnotesize},
+  err/.style={rectangle,draw,dashed,rounded corners,minimum width=3.8cm,minimum height=0.85cm,align=center,font=\scriptsize},
+  arr/.style={->,thick}
+]
+\node[stage,fill=blue!7] (s1) {图像 $I$ $\rightarrow$ 独立实例 $\{M_i\}$\\\textbf{鸿沟 1：接触/遮挡颗粒如何分离}};
+\node[stage,fill=green!7,right=0.65cm of s1] (s2) {实例 $\{M_i\}$ $\rightarrow$ 毫米几何 $\mathbf{x}_i$\\\textbf{鸿沟 2：pixel 如何获得物理尺度}};
+\node[stage,fill=orange!8,right=0.65cm of s2] (s3) {二维几何 $\rightarrow$ 标准筛分 $\mathcal{Y}$\\\textbf{鸿沟 3：投影/计数如何对应筛孔/称重}};
+\node[err,below=0.55cm of s1] (e1) {merge：偏粗；split：偏细\\漏检/遮挡：代表性下降};
+\node[err,below=0.55cm of s2] (e2) {尺度偏差近似按比例移动\\全部粒径和筛级边界};
+\node[err,below=0.55cm of s3] (e3) {二维 $\neq$ 三维筛孔行为\\数量分布 $\neq$ 质量分布};
+\draw[arr] (s1)--(s2); \draw[arr] (s2)--(s3);
+\draw[arr] (s1)--(e1); \draw[arr] (s2)--(e2); \draw[arr] (s3)--(e3);
+\end{tikzpicture}
+\caption{自然堆积视觉筛分的三个连续语义鸿沟及其典型误差方向。系统设计的目标不是单独“做好分割”，而是控制这些误差向最终标准筛分结果的传播。}
+\label{fig:r-three-gaps}
+\end{figure}
+
 据此，本文把任务形式化为一条分层测量链。给定图像 $I$，实例分割得到 $N$ 个可见颗粒掩膜
 \begin{equation}
 \mathcal{M}=\{M_i\}_{i=1}^{N}.

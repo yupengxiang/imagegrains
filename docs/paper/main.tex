@@ -84,7 +84,9 @@
 % -------------------- 参考文献 --------------------
 \clearpage
 \addcontentsline{toc}{section}{参考文献}
-\bibliographystyle{gbt7714-numeric}
+% 使用 TeX Live 2020--2025 已广泛提供的旧名称；gbt7714 2.2.0 (2026) 将其改名为 -numeric，
+% 但仍保留 -numerical 作为兼容名称，因此本写法可同时覆盖常见发行版 TeX Live 与当前 CI。
+\bibliographystyle{gbt7714-numerical}
 \bibliography{refs}
 
 % -------------------- 附录 --------------------

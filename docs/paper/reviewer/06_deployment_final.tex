@@ -1,0 +1,128 @@
+% ===== 6 工程部署与局限性（最终评委版） =====
+\section{工程部署、质量控制与方法边界}
+\label{sec:r-deploy-final}
+
+\subsection{现场系统与硬件条件}
+
+现场部署的目标不是追求单一模块的最高速度，而是保证\textbf{几何可追溯、视觉可质检、参数可冻结、结果可复算}。固定俯视相机需要为 5--40~mm 主粒级提供足够像素覆盖；低畸变镜头和刚性支架用于保持一次测试内成像几何稳定；深色哑光承载面和漫射照明降低硬阴影、高光及背景纹理对实例边界的干扰；与骨料测量面尽量共面的标尺或平面标记提供本场景的尺度锚点；CUDA GPU 主要用于压缩 Cellpose-SAM 推理时间。
+
+\begin{table}[t]
+\centering
+\caption{推荐硬件条件及其与算法误差的关系。}
+\label{tab:r-final-hardware}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{6.5cm}}
+\toprule
+模块 & 推荐条件 & 现场作用 \\
+\midrule
+相机 & 约 12~MP 或更高；固定曝光 & 保证小颗粒仍有足够像素覆盖，并减少曝光漂移 \\
+镜头/支架 & 固定焦距、低畸变、刚性俯视安装 & 保持 mm/px 稳定；高度或焦距变化后重新标定 \\
+承载面 & 深色、哑光、尽量平整 & 提高边界对比并减小参考面与测量面高度差 \\
+照明 & 大面积漫射、亮度稳定 & 减少接触颗粒间的硬阴影连接和高光碎裂 \\
+尺度参考 & 已知尺寸标尺/平面标记，尽量共面 & 建立 pixel$\rightarrow$mm 的可追溯物理锚点 \\
+计算设备 & 支持 CUDA 的 NVIDIA GPU & 缩短推理时间，为质检和一次复跑留出余量 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+软件链分为两个阶段：\texttt{imagegrains} 负责实例分割、几何测量和毫米尺度写入，\texttt{aggregate\_screening} 负责筛分等效粒径、质量代理级配、形貌、异常和场景级报告。两阶段解耦后，如果上游实例已经通过质检，下游统计可以直接从逐颗粒 CSV 重算，不必重复执行神经网络推理。正式使用时固定模型版本、$\boldsymbol{\theta}$、$\gamma$ 和规则阈值；相机几何改变时只重新测量尺度 $r$。
+
+\subsection{30 min 操作闭环}
+
+表\ref{tab:r-final-sop}给出面向赛题 30~min 约束的完整操作预算。该预算不是将约 27~s/张的历史算法时间简单外推，而是把主要余量分配给设备就位、尺度确认、图像质检、模型加载、结果复核和一次失败恢复。对于测量型视觉系统，这些步骤比继续压缩几秒推理时间更直接影响最终可靠性。
+
+\begin{table}[t]
+\centering
+\caption{面向 30~min 约束的现场操作流程。}
+\label{tab:r-final-sop}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\centering\arraybackslash}p{0.9cm}>{\raggedright\arraybackslash}p{3.1cm}>{\centering\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{7.4cm}}
+\toprule
+步骤 & 操作 & 预算 & 完成判据 \\
+\midrule
+1 & 设备就位、视场与照明 & 4~min & 目标完整入镜、相机固定、无明显模糊/硬阴影 \\
+2 & 尺度标定 & 3~min & 获得可信 mm/px，多位置参考无明显冲突 \\
+3 & 采集与快速质检 & 3~min & 图像清晰，参考物可读取且尽量共面 \\
+4 & 分割与几何测量 & 5~min & 生成实例 mask/CSV，无大面积 merge 或数量级异常 \\
+5 & 级配、形貌与异常分析 & 2~min & 生成 summary、级配曲线和可视化 \\
+6 & 结果复核与必要复跑 & 5~min & 尺度、实例、轴长和级配量级一致 \\
+7 & 导出与留档 & 3~min & 原图、参数、逐颗粒表和场景报告完整关联 \\
+-- & 故障余量 & 5~min & 用于模型首次加载、一次重拍或流程恢复 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{分层质量控制与失败恢复}
+
+系统将质检分为三层。\textbf{采集门槛}在推理前检查视场、曝光、清晰度、参考物和严重遮挡；如果输入证据本身不足，直接重拍。\textbf{实例门槛}在推理后检查 composite/overlay，重点寻找大面积 merge、异常碎裂、边缘截断和明显漏检；如果问题来自采集，则回到上一层，而不是根据最终 $D_{50}$ 是否“合理”临时调模型。\textbf{物理/报告门槛}检查尺度反算、轴长量级、筛级总和和输出文件完整性，避免旧批次 CSV、错误 resolution 或路径混用进入最终结果。
+
+\begin{table}[t]
+\centering
+\caption{典型失败信号及恢复动作。}
+\label{tab:r-final-recovery}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+失败信号 & 优先检查 & 恢复原则 \\
+\midrule
+尺度读数冲突 & 共面性、相机倾斜、镜头畸变、旧 resolution & 重新采集/标定，不改筛分参数掩盖尺度错误 \\
+大面积 merge & 硬阴影、严重接触、曝光或域失配 & 优先改善采集；仅允许使用赛前冻结的备用配置 \\
+大量细碎 split & 高光、纹理、分辨率、最小实例规则 & 检查图像后按固定规则复跑，不临场搜索阈值 \\
+$D_p$ 突然偏粗 & merge、极端异常、质量权重输入错误 & 向上追溯实例和逐颗粒表，不因结果预期修改 $\gamma$ \\
+输出文件不一致 & 批次 id、路径、流程中断 & 从最近通过质检的中间产物重算并核对关联关系 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这种门控流程同时定义了“何时单目测量不应继续解释”。若大部分颗粒严重遮挡、参考物无法建立可信尺度关系，或者实例结果出现无法通过固定流程恢复的大面积错误，则继续计算只会得到形式完整但缺乏物理依据的数字。此时应把结果标记为无效场景，而不是无限增加后处理复杂度。
+
+\subsection{结果包与可追溯性}
+
+最终输出不是单张结果图，而是由原始输入、实例结果、逐颗粒结构化数据、场景级报告和运行配置组成的证据链。每个场景通过唯一 scene id 关联这些文件，使某个 $D_{50}$、筛级占比或异常数量能够反查到具体 $d_i$、实例 mask、尺度和参数。
+
+\begin{table}[t]
+\centering
+\caption{场景结果包及其审计作用。}
+\label{tab:r-final-output-chain}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{5.5cm}}
+\toprule
+层级 & 保存内容 & 作用 \\
+\midrule
+输入层 & 原始图像、scene id、尺度参考和 $r$ & 复核成像条件及毫米尺度来源 \\
+实例层 & integer mask、composite、axes overlay & 检查 merge/split、漏检和轴长定位 \\
+颗粒层 & $a,b,A,P,d_{\mathrm{eq}},d,w$、形貌/异常标签 & 重算任一筛级或 $D_p$，定位极端权重来源 \\
+场景层 & $D_{10}/D_{50}/D_{90}$、筛级比例、级配曲线和汇总 & 形成比赛主结果与答辩展示 \\
+配置层 & 模型、$\boldsymbol{\theta}$、$\gamma$、规则版本和运行时间 & 保证结果可复现并防止批次混用 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{方法边界}
+
+本文采用的证据集决定了结论边界。首先，没有配对机械筛分称量数据，因此当前质量代理级配不能解释为标准筛分绝对准确率；这一限制来自验证证据，而不是代码是否能够输出数字。其次，单目图像无法观测完全被遮挡的颗粒，也缺少颗粒厚度信息，因此二维短轴、面积和规则形貌不可能唯一恢复真实三维筛孔行为或针片状量规结果。再次，$w=d^3$ 是几何相似条件下的质量代理，对密度、厚度和形貌变化只能近似描述。最后，泥团候选目前主要依赖几何规则，缺少颜色、纹理或材料语义证据。
+
+\begin{table}[t]
+\centering
+\caption{当前方法的主要边界及其对结果解释的影响。}
+\label{tab:r-final-limits}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{5.3cm}}
+\toprule
+边界 & 主要影响 & 本文采用的处理方式 \\
+\midrule
+无机械筛分真值 & 无法报告标准筛分绝对误差 & 所有级配结果明确称为视觉质量代理，不制造准确率 \\
+遮挡与不可见颗粒 & 可见样本代表性下降 & 通过采集质检识别严重场景；不做无证据恢复 \\
+二维缺少厚度 & 筛孔行为和三维针片状存在不可辨识残差 & 使用显式低维几何代理，并限制结论到二维投影层 \\
+质量幂律近似 & 大小/形貌变化可能使真实质量偏离 $d^3$ & 把 $d^3$ 解释为统计代理，不称为逐颗粒真实质量 \\
+泥团几何启发式 & 可能漏检或误报材质异常 & 只输出疑似候选，不作为材料鉴定 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+因此，本文的工程价值主要落在一个可部署、可解释、可追溯的视觉筛分原型：上游利用成熟预训练实例感知降低现场训练依赖，下游用明确的几何与统计模型连接赛题输出，并在没有外部物理真值的条件下严格限制结论范围。这样的表达比给出未经验证的高准确率更符合当前系统的真实成熟度。

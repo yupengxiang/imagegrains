@@ -29,6 +29,9 @@ models/IG2_full_set_cp_SAM
 # 预测输出
 demo_data/test_out
 
+# agent
+.opencode
+
 # 竞赛小样（代表性 3 张，~21 MB，可进库；*.jpg 全局忽略，此处回补）
 !demo_data/samples/
 !demo_data/samples/*.jpg
@@ -37,3 +40,20 @@ demo_data/test_out
 !demo_data/samples/results/*.tif
 !demo_data/samples/results/*.csv
 !demo_data/samples/results/*.json
+
+# 论文/答辩图表（回补，允许跟踪）
+!docs/paper/figures/
+!docs/paper/figures/*.png
+!docs/paper/figures/*.jpg
+!docs/paper/figures/*.pdf
+!docs/paper/tables/
+!docs/paper/tables/*.csv
+!docs/paper/*.tex
+!docs/paper/*.bib
+!docs/paper/*.pdf
+!docs/slide/figures/
+!docs/slide/figures/*.png
+!docs/slide/figures/*.jpg
+!docs/slide/figures/*.pdf
+!docs/slide/*.tex
+!docs/slide/*.pdf

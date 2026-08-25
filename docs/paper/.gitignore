@@ -13,11 +13,10 @@
 *.snm
 *.vrb
 
+# 编译产物由 GitHub Actions artifact 提供，不提交仓库
+*.pdf
+
 # 编辑器
 *.swp
 *~
 .DS_Store
-
-# 产物 pdf 默认不进 git（本地编译，提交时可暂时放开）
-# 取消下面注释即可跟踪 pdf：
-# !*.pdf

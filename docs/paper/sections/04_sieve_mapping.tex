@@ -162,8 +162,7 @@ $\gamma$ & 质量代理指数 & $3.0$ & $[1,5]$ & $3$ 为几何相似体积先�
 \begin{tikzpicture}[
   node distance=0.75cm and 0.85cm,
   block/.style={rectangle, draw, rounded corners, minimum height=0.95cm, minimum width=2.8cm, align=center, font=\small},
-  arrow/.style={->, thick},
-  dash/.style={->, thick, dashed}
+  arrow/.style={->, thick}
 ]
 \node[block, fill=blue!7] (calimg) {校准批次图像\\$\mathcal{X}_{\mathrm{cal}}$};
 \node[block, fill=yellow!10, below=of calimg] (calgt) {同批次机械筛分\\$\mathbf{y}_{\mathrm{cal}}^{\mathrm{GT}}$};
@@ -174,7 +173,7 @@ $\gamma$ & 质量代理指数 & $3.0$ & $[1,5]$ & $3$ 为几何相似体积先�
 \draw[arrow] (calgt.east) -| (fit.south);
 \draw[arrow] (fit) -- node[above, font=\scriptsize]{冻结参数} (testimg);
 \draw[arrow] (testimg) -- (compare);
-\draw[dash] (calgt.east) -- ++(0.35,0) node[right, font=\scriptsize, align=left]{校准 GT\\不进入测试};
+\draw[->, thick, dashed] (calgt.east) -- ++(0.35,0) node[right, font=\scriptsize, align=left]{校准 GT\\不进入测试};
 \end{tikzpicture}
 \caption{参数校准与独立验证的分离。$\boldsymbol{\theta}$ 和 $\gamma$ 仅由校准批次确定，冻结后应用于未参与拟合的测试批次；最终准确性只在独立测试批次上报告。}
 \label{fig:calibration-protocol}

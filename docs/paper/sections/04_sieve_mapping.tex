@@ -1,0 +1,185 @@
+% ===== 4 从视觉测量到标准筛分级配 =====
+\section{从视觉测量到标准筛分级配}
+\label{sec:sieve-mapping}
+
+第\ref{sec:visual-measurement}章已经将现场图像转换为逐颗粒的毫米级二维几何表征，但这仍不是比赛最终评价所要求的标准筛分结果。机械筛分通过颗粒在给定筛孔下的通过行为进行分级，并按各粒级\emph{质量}统计；单目视觉则直接观测固定视角下的二维投影，并天然得到逐颗粒的\emph{数量}样本。二者之间因此存在“投影尺寸到筛分尺寸”和“颗粒数量到颗粒质量”两个连续的语义转换。本章建立一个低维、显式且可由机械筛分真值校准的映射，将第\ref{sec:geometry-features}节的颗粒几何量转换为与标准筛分可比较的累计质量级配。
+
+\subsection{二维视觉粒径与机械筛分粒径的差异}
+\label{sec:visual-vs-sieve-size}
+
+机械筛分中的粒径并不是对某一固定投影方向几何长度的直接测量，而是由颗粒在振筛过程中能否通过特定筛孔所定义的等效尺寸。颗粒可以在筛分过程中发生平移与转动，其通过能力同时受到三个方向尺寸、形貌和姿态的影响。相比之下，单目俯视图只能得到某一时刻的二维投影轮廓。因此，即使实例分割和毫米尺度恢复完全准确，图像中的长轴、短轴或面积等效直径也不能在一般情况下与机械筛孔尺寸建立严格的一一恒等关系。
+
+对于不规则颗粒，投影短轴 $b_i$ 相比长轴 $a_i$ 更接近限制颗粒通过筛孔的横向尺度，因此可作为筛分粒径的一个具有物理直觉的视觉代理量；类似地，数字图像粒度分析通常也需要在可观测二维尺寸与筛分或重量分布之间建立额外的转换关系\cite{mair2023automated,maiti2017massModel}。然而，仅使用 $b_i$ 仍会受到观察姿态、未知厚度以及形状差异的影响。例如，对于扁平颗粒，俯视短轴可能显著大于其厚度；对于近圆但表面不规则的颗粒，等面积尺度又可能比单一轴长更稳定。由此可见，$b_i$ 更适合作为\emph{基线代理量}，而不是无需验证的真实筛分粒径。
+
+本文因此将视觉尺寸与筛分尺寸之间的关系视为一个需要由物理试验标定的低维映射问题。设计目标并不是从二维图像恢复完整三维形状，而是在比赛关注的粒级范围内寻找一个能够稳定预测批次级质量分布的\emph{筛分等效粒径}。这种定义承认单目观测的信息边界，同时把不可直接观测的平均姿态和形貌偏差集中到少量显式参数中，使其可以通过同批次机械筛分数据进行校准和独立验证。
+
+基于这一思路，下一节不直接规定某一个二维特征等于筛孔尺寸，而是以短轴为主、面积等效直径为补充，定义可调的颗粒级筛分等效粒径模型。
+
+\subsection{筛分等效粒径模型}
+\label{sec:sieve-equivalent-diameter}
+
+对第 $i$ 个颗粒，本文定义筛分等效粒径
+\begin{equation}
+ d_i(\boldsymbol{\theta})
+ =\theta_1 b_i+\theta_2 d_{\mathrm{eq},i}+\theta_3,
+ \qquad
+ \boldsymbol{\theta}=(\theta_1,\theta_2,\theta_3),
+ \label{eq:sieve-equivalent}
+\end{equation}
+其中 $b_i$ 为椭圆短轴，$d_{\mathrm{eq},i}$ 为式\eqref{eq:eq-diameter-geometry}定义的面积等效直径。$\theta_1$ 控制短轴这一主要通过尺度的贡献，$\theta_2$ 允许整体投影面积对粒径进行补偿，$\theta_3$ 则表示批次尺度关系之外的平均加性偏置。该模型并不声称三个参数分别对应可独立测量的三种物理机制，而是用最小的自由度描述二维观测与机械筛分之间可能存在的一阶系统偏差。
+
+在尚未获得配对机械筛分真值时，代码采用
+\begin{equation}
+ \boldsymbol{\theta}_0=(1,0,0),
+ \label{eq:theta-default}
+\end{equation}
+即 $d_i=b_i$，作为无需额外假设的初始基线。该默认值的意义是“以短轴作为筛分粒径代理量”，而\textbf{不是}已经由本赛题标准筛分数据验证得到的最终参数。只有在独立的同批次机械筛分实验完成后，才能判断是否需要引入 $d_{\mathrm{eq}}$ 补偿以及加性偏置，并报告校准后参数在未参与拟合批次上的泛化误差。
+
+选择式\eqref{eq:sieve-equivalent}这样的低维显式模型，而不是直接训练图像到级配曲线的高容量端到端网络，主要有三点考虑。第一，比赛现场可获得的图像--机械筛分配对批次数量远少于通用视觉预训练数据，复杂模型更容易将有限批次中的偶然差异拟合为规则；第二，显式参数可以分别通过消融分析判断短轴与面积尺度的贡献；第三，当更换相机或骨料来源后，只需重新估计少量下游参数，而无需默认重新训练上游实例分割网络。端到端从图像预测筛分结果的研究表明数据驱动映射是可行方向\cite{coenen2022learningToSieve,buscombe2020sedinet}，本文则更侧重比赛条件下的小样本可校准性与结果可解释性。
+
+表\ref{tab:sieve-parameters}汇总了当前实现中筛分映射的四个核心参数。需要注意的是，$\boldsymbol{\theta}$ 只解决“单颗粒二维几何应对应多大的筛分等效尺寸”，但标准机械筛分并不按颗粒数量统计这些尺寸。即使 $d_i$ 完全正确，如果所有颗粒仍被赋予相同权重，最终级配依然会系统性偏向数量占优的小颗粒。因此，还需要进一步解决数量分布与质量分布之间的统计口径差异。
+
+\begin{table}[htbp]
+\centering
+\caption{筛分语义映射的核心参数、默认值与校准范围}
+\label{tab:sieve-parameters}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.8cm}>{\raggedright\arraybackslash}p{3.1cm}>{\centering\arraybackslash}p{2.1cm}>{\centering\arraybackslash}p{2.3cm}>{\raggedright\arraybackslash}p{4.2cm}}
+\toprule
+参数 & 作用 & 当前默认 & 搜索范围 & 状态与解释 \\
+\midrule
+$\theta_1$ & 短轴 $b_i$ 系数 & $1.0$ & $[0,3]$ & 基线由短轴主导；最终值需筛分真值校准 \\
+$\theta_2$ & $d_{\mathrm{eq},i}$ 系数 & $0.0$ & $[0,3]$ & 是否需要面积尺度补偿由数据决定 \\
+$\theta_3$ & 加性粒径偏置 & $0.0$~mm & $[-20,20]$~mm & 吸收平均系统偏移，不代表颗粒厚度测量 \\
+$\gamma$ & 质量代理指数 & $3.0$ & $[1,5]$ & $3$ 为几何相似体积先验；最终值可联合校准 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{从颗粒数量到质量权重}
+\label{sec:mass-weighting}
+
+视觉实例分割天然产生的是一个颗粒列表：若直接对 $\{d_i\}_{i=1}^{N}$ 计算经验分布，每个颗粒的统计权重均为 1。这种\emph{数量分布}回答的是“随机抽取一个颗粒，其粒径小于某值的概率是多少”。标准机械筛分则在各筛孔上称量保留或通过的材料，回答的是“总质量中有多少比例由某一粒径范围的颗粒贡献”。当一个批次同时包含大量细颗粒和少量粗颗粒时，两种问题的答案可以存在显著差异：粗颗粒数量虽少，但单颗质量往往远大于细颗粒，因此不能用颗粒个数直接替代筛分质量。
+
+在缺乏逐颗粒真实质量和厚度测量的单目条件下，本文用筛分等效粒径的幂函数作为单颗粒质量的代理权重：
+\begin{equation}
+ w_i=d_i^{\gamma}.
+ \label{eq:mass-weight}
+\end{equation}
+若颗粒密度近似一致、不同尺寸颗粒在统计意义上保持几何相似，则体积及质量随线性尺度近似按三次方增长，因此 $\gamma=3$ 可作为具有物理直觉的初始先验。数字图像粒度研究中，从二维数量型统计估计重量型分布同样需要显式质量转换或经验校准\cite{maiti2017massModel}。在本文实现中，$\gamma$ 不被固定为不可改变的物理常数，而是与 $\boldsymbol{\theta}$ 一同保留为可校准参数，以吸收颗粒厚度、形貌或尺寸相关密度在批次平均意义下造成的偏差。
+
+式\eqref{eq:mass-weight}应被理解为\textbf{质量代理模型}而非逐颗粒称重。它无法恢复单个颗粒真实密度，也不能消除扁平颗粒或不同岩性导致的个体质量差异；其有效性最终应由批次级机械筛分曲线是否得到改善来判断。因此，当前示例中“数量分布与 $\gamma=3$ 加权分布明显不同”只能说明质量权重对统计结果具有较强影响，不能单独证明 $\gamma=3$ 就是正确参数。第\ref{sec:sieve-calibration}节将通过配对筛分真值把这一物理先验转化为可验证的校准问题。
+
+质量加权还解释了为什么异常大颗粒必须被独立标记并在提交口径中明确处理。由于 $w_i$ 随 $d_i^{\gamma}$ 快速增长，一个错误合并的实例或尺寸远超正常范围的异物可能仅凭极少数量就占据较大的总权重，从而显著移动 $D_{50}$ 或 $D_{90}$。因此，质量模型提高了与机械筛分口径的一致性，同时也放大了上游粗粒误检的影响；这一现象将在后续异常检测和消融实验中单独分析。
+
+获得 $d_i$ 和 $w_i$ 后，可以将逐颗粒预测聚合为与机械筛分曲线一致的累计质量分布，并进一步计算特征粒径和各标准筛级质量占比。
+
+\subsection{累计质量分布、特征粒径与筛级占比}
+\label{sec:weighted-grading}
+
+给定一个场景中 $N$ 个颗粒的筛分等效粒径 $d_i$ 及其质量代理权重 $w_i$，定义累计质量通过函数
+\begin{equation}
+ F(d)=\frac{\sum_{i=1}^{N}w_i\,\mathbf{1}(d_i\le d)}{\sum_{i=1}^{N}w_i},
+ \label{eq:weighted-cdf}
+\end{equation}
+其中 $\mathbf{1}(\cdot)$ 为指示函数。$F(d)$ 表示按当前质量代理模型估计的、等效粒径不大于 $d$ 的质量比例，与机械筛分中累计通过/较细质量占比的统计方向保持一致。与数量型经验分布相比，式\eqref{eq:weighted-cdf}唯一改变的是每个颗粒对累计分布的贡献权重，因此可以清楚地将“颗粒尺寸估计”和“质量统计假设”两个误差来源分开分析。
+
+本文以 $D_{10}$、$D_{50}$ 和 $D_{90}$ 表示累计质量分布达到 10\%、50\% 和 90\% 时对应的等效粒径。当前代码对 $d_i$ 从小到大排序并累计 $w_i$，随后采用阶梯经验分布的左连续逆：
+\begin{equation}
+ D_p=\min\left\{d:\,F(d)\ge \frac{p}{100}\right\},
+ \qquad p\in\{10,50,90\}.
+ \label{eq:weighted-percentile}
+\end{equation}
+因此，报告中的 $D_p$ 是离散颗粒加权经验分布上的实际颗粒等效粒径，而不是在相邻样本之间进行线性插值得到的平滑分位点。明确这一实现细节有助于解释小样本或粗粒权重高度集中时 $D_p$ 的阶梯变化，也解释了后续校准目标函数为何不适合依赖普通梯度优化。
+
+除特征粒径外，系统按照当前比赛分析所采用的筛孔序列
+\begin{equation}
+ \mathcal{S}=\{5,10,16,20,25,31.5,40\}\ \mathrm{mm}
+ \label{eq:sieve-set}
+\end{equation}
+计算各粒级质量占比。对相邻筛孔 $s_k<s_{k+1}$，粒级占比定义为
+\begin{equation}
+ P_k=100\%\times
+ \frac{\sum_i w_i\,\mathbf{1}(s_k\le d_i<s_{k+1})}
+ {\sum_i w_i}.
+ \label{eq:size-fraction}
+\end{equation}
+实现同时保留 $d_i<5$~mm 和 $d_i\ge40$~mm 两个边界桶，从而使所有颗粒质量代理权重构成完备分区。内部文件名沿用 ``$>40$'' 标签，但其代码判定边界为 $d_i\ge40$~mm；正式结果表和图中将统一以数学区间为准，避免标签文字与实际条件产生歧义。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.75cm,
+  block/.style={rectangle, draw, rounded corners, minimum height=0.9cm, minimum width=2.55cm, align=center, font=\small},
+  arrow/.style={->, thick}
+]
+\node[block, fill=green!7] (geom) {$b_i,A_i,r$\\视觉几何};
+\node[block, fill=orange!8, right=of geom] (diam) {$d_i(\boldsymbol{\theta})$\\筛分等效粒径};
+\node[block, fill=orange!8, right=of diam] (mass) {$w_i=d_i^{\gamma}$\\质量代理};
+\node[block, fill=blue!7, below=0.8cm of mass] (cdf) {$F(d)$\\累计质量分布};
+\node[block, fill=blue!7, left=of cdf] (dp) {$D_{10},D_{50},D_{90}$\\特征粒径};
+\node[block, fill=blue!7, right=of cdf] (frac) {$P_k$\\标准筛级占比};
+\draw[arrow] (geom) -- (diam);
+\draw[arrow] (diam) -- (mass);
+\draw[arrow] (mass) -- (cdf);
+\draw[arrow] (cdf) -- (dp);
+\draw[arrow] (cdf) -- (frac);
+\end{tikzpicture}
+\caption{从颗粒级视觉几何到场景级质量级配的统计映射。$\boldsymbol{\theta}$ 决定视觉尺寸如何转换为筛分等效粒径，$\gamma$ 决定不同尺寸颗粒的相对质量贡献，两者共同影响累计曲线和特征粒径。}
+\label{fig:sieve-statistical-mapping}
+\end{figure}
+
+上述统计量已经与机械筛分报告处于可比较的批次级语义空间，但“形式上可比较”并不意味着当前默认参数已经准确。要使视觉系统从合理的工程假设进一步变成经数据验证的预测方法，仍需要用同一批材料的机械筛分结果约束 $\boldsymbol{\theta}$ 和 $\gamma$，并在独立批次上检验校准后的泛化能力。
+
+\subsection{基于标准筛分真值的参数校准}
+\label{sec:sieve-calibration}
+
+机械筛分在本文中具有双重角色：一方面，它为视觉到筛分语义的映射提供离线校准参考；另一方面，它也是评价最终粒径级配准确性的独立 ground truth。对于第 $k$ 个骨料批次，同一批材料先形成视觉颗粒数据 $\mathcal{X}_k$，并通过标准机械筛分得到目标特征粒径
+\begin{equation}
+ \mathbf{y}_k=(D_{10,k}^{\mathrm{GT}},D_{50,k}^{\mathrm{GT}},D_{90,k}^{\mathrm{GT}}).
+ \label{eq:calibration-target}
+\end{equation}
+视觉路径与机械筛分路径在获取结果前相互独立，只在批次级建立配对关系。这保证了校准针对的是“视觉统计与物理筛分的差异”，而不是用模型自身派生量作为真值。
+
+当前实现联合优化四个参数 $(\theta_1,\theta_2,\theta_3,\gamma)$。对 $K$ 个校准批次，代码采用三个特征粒径的加权相对平方误差：
+\begin{equation}
+ \mathcal{L}(\boldsymbol{\theta},\gamma)
+ =\frac{1}{3K}\sum_{k=1}^{K}\sum_{p\in\{10,50,90\}}
+ \alpha_p
+ \left(
+ \frac{\widehat{D}_{p,k}-D_{p,k}^{\mathrm{GT}}}
+ {\max(D_{p,k}^{\mathrm{GT}},10^{-6})}
+ \right)^2,
+ \label{eq:calibration-loss}
+\end{equation}
+其中 $(\alpha_{10},\alpha_{50},\alpha_{90})=(0.25,0.50,0.25)$，使代表分布中心位置的 $D_{50}$ 获得较高权重。当前损失函数\textbf{仅使用} $D_{10}/D_{50}/D_{90}$，并未将每一个筛级 $P_k$ 的误差直接加入优化目标；因此后续实验仍应独立报告各筛级质量占比误差，以检验模型是否可能在三个分位点匹配良好但局部级配形状仍存在偏差。
+
+由于式\eqref{eq:weighted-percentile}采用离散阶梯分布逆，参数的微小变化可能在某些位置不改变 $D_p$，跨过颗粒权重阈值时又产生离散跳变，使目标函数不具备适合常规梯度下降的平滑性。因此，当前 \texttt{fit\_calibration} 使用差分进化进行无梯度全局搜索。搜索边界与表\ref{tab:sieve-parameters}一致：$\theta_1,\theta_2\in[0,3]$，$\theta_3\in[-20,20]$~mm，$\gamma\in[1,5]$；实现固定随机种子并最多迭代 1000 次，以提高校准过程的可复现性。这里的优化算法只是寻找低维参数的数值工具，方法的核心仍是由同批次机械筛分定义监督信号，而不是差分进化本身。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.75cm and 0.85cm,
+  block/.style={rectangle, draw, rounded corners, minimum height=0.95cm, minimum width=2.8cm, align=center, font=\small},
+  arrow/.style={->, thick},
+  dash/.style={->, thick, dashed}
+]
+\node[block, fill=blue!7] (calimg) {校准批次图像\\$\mathcal{X}_{\mathrm{cal}}$};
+\node[block, fill=yellow!10, below=of calimg] (calgt) {同批次机械筛分\\$\mathbf{y}_{\mathrm{cal}}^{\mathrm{GT}}$};
+\node[block, fill=orange!8, right=1.0cm of calimg] (fit) {差分进化\\拟合 $\hat{\boldsymbol{\theta}},\hat\gamma$};
+\node[block, fill=green!7, right=1.0cm of fit] (testimg) {独立测试批次\\$\mathcal{X}_{\mathrm{test}}$};
+\node[block, fill=gray!8, below=of testimg] (compare) {预测级配 vs.\\测试批次筛分真值};
+\draw[arrow] (calimg) -- (fit);
+\draw[arrow] (calgt.east) -| (fit.south);
+\draw[arrow] (fit) -- node[above, font=\scriptsize]{冻结参数} (testimg);
+\draw[arrow] (testimg) -- (compare);
+\draw[dash] (calgt.east) -- ++(0.35,0) node[right, font=\scriptsize, align=left]{校准 GT\\不进入测试};
+\end{tikzpicture}
+\caption{参数校准与独立验证的分离。$\boldsymbol{\theta}$ 和 $\gamma$ 仅由校准批次确定，冻结后应用于未参与拟合的测试批次；最终准确性只在独立测试批次上报告。}
+\label{fig:calibration-protocol}
+\end{figure}
+
+为避免数据泄漏，最终实验必须将用于拟合 $\boldsymbol{\theta},\gamma$ 的校准批次与用于报告准确性的测试批次分离，如图\ref{fig:calibration-protocol}所示。当前实现并不强制最少校准批次数量，但四参数模型在极少批次下容易出现不可辨识或过拟合，因此正式实验应使用多个具有不同级配组成的校准批次，并保留完全独立的测试批次。若后续获得的数据量足够，还可以进一步采用交叉验证或按骨料来源分层验证，以判断参数是否真正反映稳定的视觉--筛分关系，而非某一批材料的偶然特征。
+
+经过上述步骤，本文的主粒径分析链已经从二维实例几何闭环到标准筛分语义：$\mathbf{x}_i\rightarrow d_i\rightarrow w_i\rightarrow F(d)\rightarrow\{D_p,P_k\}$，并为关键参数建立了明确的物理真值校准入口。与这一主路径并行，同一组实例几何特征还可以用于赛题要求的颗粒形貌和异常识别。下一章将讨论这些附加任务，并明确区分可由几何阈值直接定义的尺寸异常与仍需要纹理/语义信息支持的泥团等异常类别。

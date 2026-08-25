@@ -54,7 +54,7 @@ pytest tests/test_report.py -v
 resolution $r$ & 0.208~mm/px（演示） & 本次成像尺度标定 & 每次设备几何变化后重新测量 \\
 $\theta_1,\theta_2,\theta_3$ & $(1,0,0)$（未校准基线） & 配对机械筛分校准 & 赛前拟合并冻结 \\
 $\gamma$ & 3（体积先验基线） & 配对机械筛分校准 & 赛前拟合并冻结 \\
-Cellpose-SAM 模型 & \texttt{IG2\_full\_set\_cp\_SAM} & ImageGrains 2.0 预训练模型 & 比赛前固定版本 \\
+Cellpose-SAM 模型 & IG2 full-set Cellpose-SAM & ImageGrains 2.0 预训练模型 & 比赛前固定版本 \\
 实例分割配置 & 当前仓库固定配置 & 开发/人工实例验证 & 测试时原则上冻结 \\
 形貌阈值 & \texttt{MorphThresholds} & 开发数据/人工标签 & 有独立标签后校准并冻结 \\
 泥团几何阈值 & 40--50~mm + solidity & 当前启发式规则 & 仅作疑似筛查，不作为已验证语义分类 \\
@@ -67,7 +67,7 @@ Cellpose-SAM 模型 & \texttt{IG2\_full\_set\_cp\_SAM} & ImageGrains 2.0 预训�
 \section{主要输出文件与赛题任务映射}
 \label{app:outputs}
 
-系统的输出不是单一最终图片，而是一组从原始实例到场景报告的分层证据。表\ref{tab:appendix-outputs}给出主要文件与用途。文件名可能随场景 id 改变，但后缀和语义保持一致。
+系统的输出不是单一最终图片，而是一组从原始实例到场景报告的分层证据。表\ref{tab:appendix-outputs}给出主要文件与用途。文件名可能随场景 id 改变，但后缀和语义保持一致；精确文件名可直接查看对应场景输出目录。
 
 \begin{table}[htbp]
 \centering
@@ -80,15 +80,15 @@ Cellpose-SAM 模型 & \texttt{IG2\_full\_set\_cp\_SAM} & ImageGrains 2.0 预训�
 输出 & 内容 & 用途 \\
 \midrule
 \texttt{*\_pred.tif} & 每个颗粒独立实例 id 的 mask & 精细识别、实例数量、人工复核 \\
-\texttt{*\_composite.png} / \texttt{*\_detection\_overview.png} & 原图与实例边界/标注叠加 & 快速发现 merge、split、漏检 \\
+检测概览图 & 原图与实例边界/标注叠加 & 快速发现 merge、split、漏检 \\
 \texttt{*\_pred\_grains.csv} & 像素级面积、轴长、周长等 & 几何测量中间证据 \\
 \texttt{*\_re\_scaled.csv} & 加入毫米轴长的逐颗粒表 & 粒径分析、尺度追溯 \\
-\texttt{*\_particles\_annotated.csv} & $d_i$、形貌和异常标签等 & 单颗粒级结果追溯 \\
+实例标注 CSV & $d_i$、形貌和异常标签等 & 单颗粒级结果追溯 \\
 \texttt{*\_summary.json} & resolution、参数、$D_p$、粒级、形貌、异常汇总 & 场景级机器可读报告 \\
-\texttt{*\_gsd\_comparison.png} & 数量型与质量代理级配图 & 解释统计口径差异 \\
+级配比较图 & 数量型与质量代理级配图 & 解释统计口径差异 \\
 \texttt{*\_axes\_overlay.png} & 颗粒长短轴和尺度叠加 & 物理尺寸目检 \\
-\texttt{*\_shape\_*.png} & 各投影形貌类别高亮 & 形貌结果展示与人工核验 \\
-\texttt{*\_anomaly\_*.png} & 异常类别高亮 & 大块/过小/疑似异常定位 \\
+形貌高亮图 & 各投影形貌类别高亮 & 形貌结果展示与人工核验 \\
+异常高亮图 & 异常类别高亮 & 大块/过小/疑似异常定位 \\
 \bottomrule
 \end{tabular}
 \end{table}

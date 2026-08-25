@@ -81,26 +81,7 @@ $D_p$ 突然偏粗 & merge、极端异常、质量权重输入错误 & 向上追
 
 \subsection{结果包与可追溯性}
 
-每个场景的结果包由原始输入、实例结果、逐颗粒结构化数据、场景级报告和运行配置组成，并通过唯一 scene id 关联。任一 $D_{50}$、筛级占比或异常数量都可以反查到对应的 $d_i$、实例 mask、尺度和参数。
-
-\begin{table}[t]
-\centering
-\caption{场景结果包及其审计作用。}
-\label{tab:r-final-output-chain}
-\footnotesize
-\renewcommand{\arraystretch}{1.1}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{5.5cm}}
-\toprule
-层级 & 保存内容 & 作用 \\
-\midrule
-输入层 & 原始图像、scene id、尺度参考和 $r$ & 复核成像条件及毫米尺度来源 \\
-实例层 & integer mask、composite、axes overlay & 检查 merge/split、漏检和轴长定位 \\
-颗粒层 & $a,b,A,P,d_{\mathrm{eq}},d,w$、形貌/异常标签 & 重算任一筛级或 $D_p$，定位极端权重来源 \\
-场景层 & $D_{10}/D_{50}/D_{90}$、筛级比例、级配曲线和汇总 & 形成比赛主结果与答辩展示 \\
-配置层 & 模型、$\boldsymbol{\theta}$、$\gamma$、规则版本和运行时间 & 保证结果可复现并防止批次混用 \\
-\bottomrule
-\end{tabular}
-\end{table}
+每个场景通过唯一 scene id 关联原始图像与尺度信息、integer mask 与实例可视化、逐颗粒几何和筛分字段、场景级级配报告以及模型与规则配置。逐颗粒表保存 $a,b,A,P,d_{\mathrm{eq}},d,w$ 和形貌/异常标签，因此任一 $D_p$、筛级占比或异常数量都能回溯到具体实例、尺度和参数；实例结果已经通过质检时，下游级配也能直接从结构化数据重算。附录进一步列出当前复现参数和最小结果包内容。
 
 \subsection{方法边界}
 

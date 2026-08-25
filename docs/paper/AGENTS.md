@@ -8,8 +8,9 @@ Before editing the technical report:
 2. Read `../ai/DECISIONS.md` for fixed technical and evidence-boundary decisions.
 3. Read `../ai/report-writing-skill/SKILL.md` and use it as the editing rubric.
 4. Treat `main.tex` as the only canonical report entrypoint.
+5. Treat `sections/` as the only chapter source tree.
 
-Do not recreate `main_submission.tex` or `main_v2.tex`.
+Do not recreate `main_submission.tex`, `main_v2.tex`, `reviewer/`, `*_final.tex` chapter copies, or parallel historical chapter trees. `sections/` should contain only files actually referenced by `main.tex`.
 
 The current report is a final-evidence competition technical report. Do not introduce placeholders for future mechanical-sieving experiments, manual instance annotations, or other data that the project has decided not to collect for this submission.
 

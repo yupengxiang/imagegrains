@@ -8,10 +8,12 @@
 
 影响：不改 `src/imagegrains/` 公开签名/CLI/输出格式；新能力放独立子包；不设计传送带。
 
-## 正式报告：唯一入口与最终证据政策
+## 正式报告：唯一入口、唯一章节树与最终证据政策
 
 - 正式论文唯一入口为 `docs/paper/main.tex`。
-- 旧 `main_submission.tex` 与 `main_v2.tex` 已删除。
+- `docs/paper/sections/` 是唯一章节源，只保留 `main.tex` 实际引用的摘要、7 个正文 section 和附录。
+- 不建立平行章节树，不保留 `*_final.tex` 副本或未引用历史章节；历史内容由 Git 版本记录承担。
+- 旧 `main_submission.tex`、`main_v2.tex` 与 `docs/paper/reviewer/` 已删除。
 - 当前三张真实图像、现有算法输出、27 项合成测试与已有运行记录构成本轮报告的最终证据集。
 - 本轮不再新增机械筛分、人工实例 mask 或材料语义标注实验。
 - 报告不保留“待补真值”“后续回填实验结果”等中期稿叙事。

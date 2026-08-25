@@ -1,0 +1,134 @@
+% ===== 3 视觉感知与物理测量 =====
+\section{视觉感知与物理测量}
+\label{sec:visual-measurement}
+
+沿图\ref{fig:overall-architecture}的主处理链，本章解决从现场照片到颗粒级物理表征的映射 $I\rightarrow\mathcal{M}\rightarrow\{\mathbf{x}_i\}$。这一阶段的目标并不是直接预测最终级配，而是尽可能稳定地回答三个基础问题：图像是否具有可测量的成像条件、每个可见颗粒的实例边界在哪里，以及如何将这些像素轮廓转换为具有统一物理单位的几何量。只有在这些基础量可追溯的前提下，下一章讨论的筛分等效粒径和质量级配映射才具有工程意义。
+
+\subsection{图像采集与成像条件}
+\label{sec:image-acquisition}
+
+图像采集的首要目标不是获得视觉效果最好的照片，而是提高颗粒边界的可辨识性并保持尺度关系稳定。自然堆积场景中的分割误差往往并非完全来自模型本身：强方向性照明会在颗粒一侧形成与真实轮廓相似的阴影边界，镜面高光会破坏颗粒内部纹理，而过大的视角倾斜则会使图像不同位置具有不同的实际尺度。因此，本文将成像条件视为整个测量链的第一层误差控制，而不是独立于算法之外的辅助步骤。
+
+在当前原型中，采用单目近正俯视成像，并尽量固定相机工作距离与焦距；样品区域使用与骨料具有较高明度或颜色对比的哑光背景，并采用相对均匀的漫射照明以降低硬阴影和局部过曝。对于可人工控制的演示或比赛采样区域，颗粒铺放应尽量减少多层堆叠，使主要颗粒的可见轮廓保持完整。需要强调的是，这里的“减少堆叠”并不改变自然堆积赛道所面对的接触和局部遮挡问题，而是避免将本可由简单采样操作消除的大面积不可见区域转化为无法由单目视觉恢复的信息损失。
+
+空间分辨率需要根据赛题关注的最小粒径反向设计。若图像分辨率为 $r$~mm/px，则物理尺寸为 $d$ 的目标在图像上的典型线性跨度约为
+\begin{equation}
+ n_{\mathrm{px}}\approx \frac{d}{r}.
+ \label{eq:pixel-span}
+\end{equation}
+当 $n_{\mathrm{px}}$ 过小时，实例边界的一个像素偏差将占据较大的相对比例，同时纹理和形状特征也难以稳定计算。当前示例数据使用约 $0.208$~mm/px 的尺度时，$5$~mm 颗粒对应约 $24$~px 的线性跨度，可作为现有演示设置的量级参考；最终现场设备参数仍应通过尺度测量实验确定，而不应将该数值视为对不同相机和工作距离通用的固定配置。
+
+通过上述成像控制，可以降低光照、透视和采样方式对上游实例边界的干扰，但图像仍然只定义在像素坐标系中。为了使后续 $5$、$10$、$50$~mm 等物理阈值具有明确意义，下一步必须建立像素与实际长度之间的尺度映射。
+
+\subsection{尺度标定与物理单位恢复}
+\label{sec:scale-calibration}
+
+尺度系数是整个测量链的物理锚点。设图像中一段已知实际长度为 $L_{\mathrm{real}}$ 的参考物在图像上对应 $L_{\mathrm{px}}$ 个像素，则局部尺度可表示为
+\begin{equation}
+ r=\frac{L_{\mathrm{real}}}{L_{\mathrm{px}}}\quad [\mathrm{mm/px}].
+ \label{eq:scale-factor}
+\end{equation}
+在近正俯视、工作距离固定且镜头畸变可忽略的条件下，可以用单一 $r$ 对整个图像进行一阶尺度恢复。若现场存在明显透视或畸变，则应进一步利用平面标定板、ArUco 等已知几何参考建立位置相关的单应或相机模型；该部分属于当前原型的工程升级方向，而不是已经在现有代码中自动完成的步骤。
+
+当前 ImageGrains 命令行接口通过 \texttt{--resolution} 接收已经获得的 mm/px 标定结果，也允许使用包含逐图像尺度的 CSV 文件。对于像素空间测得的长轴 $a_i^{\mathrm{px}}$、短轴 $b_i^{\mathrm{px}}$ 和投影面积 $A_i^{\mathrm{px}}$，物理量按照
+\begin{equation}
+ a_i=r\,a_i^{\mathrm{px}},\qquad
+ b_i=r\,b_i^{\mathrm{px}},\qquad
+ A_i^{\mathrm{mm}^2}=r^2 A_i^{\mathrm{px}}
+ \label{eq:scale-conversion}
+\end{equation}
+进行转换。长度量与 $r$ 线性相关，而面积量与 $r^2$ 相关，因此尺度误差不仅影响最终粒径，还会进一步进入面积等效直径、形貌和质量代理量的计算。
+
+下游 \texttt{aggregate\_screening} 模块还提供 \texttt{infer\_resolution}，当同一颗粒表同时包含短轴的像素列和毫米列时，通过 $b_i^{\mathrm{mm}}/b_i^{\mathrm{px}}$ 的中位数恢复此前使用的尺度参数。该操作的作用是保证由 ImageGrains 产生的中间 CSV 在进入第二阶段分析时能够自动传递尺度，而\textbf{不是}从未知场景中自动发现真实物理尺寸。换言之，毫米列本身已经包含上游物理标定信息，\texttt{infer\_resolution} 只是对该信息的显式追溯。为避免将数据格式便利性误解为免标定能力，本文将“现场物理标定”和“CSV 中的尺度回传”作为两个不同步骤处理。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  block/.style={rectangle, draw, rounded corners, minimum height=0.9cm, minimum width=2.5cm, align=center, font=\small},
+  arrow/.style={->, thick}
+]
+\node[block, fill=blue!7] (ref) {已知尺度参考\\$L_{\mathrm{real}}$};
+\node[block, fill=blue!7, right=of ref] (scale) {现场尺度标定\\$r$ (mm/px)};
+\node[block, fill=green!7, right=of scale] (pxmm) {ImageGrains 尺度恢复\\px $\rightarrow$ mm};
+\node[block, fill=orange!8, right=of pxmm] (csv) {颗粒表\\px/mm 双列};
+\node[block, fill=gray!8, below=0.8cm of csv] (infer) {下游尺度回传\\\texttt{infer\_resolution}};
+\draw[arrow] (ref) -- (scale);
+\draw[arrow] (scale) -- (pxmm);
+\draw[arrow] (pxmm) -- (csv);
+\draw[arrow, dashed] (csv) -- (infer);
+\end{tikzpicture}
+\caption{尺度信息的传递关系。实线表示必须由现场物理参考建立的尺度链；虚线表示下游程序从已有 px/mm 双列中恢复此前使用的尺度参数，不能替代现场标定。}
+\label{fig:scale-provenance}
+\end{figure}
+
+若尺度估计存在相对误差 $\varepsilon_r=\Delta r/r$，则由式\eqref{eq:scale-conversion}可知，直接长度测量的一阶相对误差也约为 $\varepsilon_r$。这意味着尺度并非仅影响某一个后处理参数，而会对所有毫米级粒径产生共同的系统偏移。因此，第\ref{sec:experimental-design}节所设计的实验将单独评价尺度恢复误差，并在现场工作流中将尺度校验置于模型推理之前。完成物理尺度定义后，仍需要从自然堆积图像中恢复每个颗粒的独立实例边界。
+
+\subsection{基于 ImageGrains 2.0 / Cellpose-SAM 的实例分割}
+\label{sec:instance-segmentation}
+
+粒径测量要求获得逐颗粒轮廓，因此本任务需要的是实例分割而非仅给出前景区域的语义分割。若两个相互接触的颗粒被合并为一个实例，其拟合轴和面积会被系统性放大；反之，一个颗粒被切分为多个实例则会使粒径统计偏细。已有颗粒图像研究表明，分割边界质量会直接传播到粒径和形貌测量的不确定性\cite{mair2022uncertainty,mair2026imagegrains2}，因此本文将实例恢复作为后续所有定量分析的共享视觉基座。
+
+本文采用 ImageGrains 2.0 提供的细粒度颗粒分割流程，并使用其基于 Cellpose-SAM 的预训练模型 \texttt{IG2\_full\_set\_cp\_SAM}\cite{mair2026imagegrains2,zenodoIG2}。Cellpose-SAM 将预训练的 SAM 表征引入 Cellpose 实例分割框架，并强调在目标尺寸、噪声和成像变化下的泛化能力\cite{pachitariu2025cellposeSAM}。ImageGrains 2.0 又使用多类沉积物颗粒数据对该框架进行颗粒域适配，使其比直接使用通用前景分割更符合本任务中“大量同类不规则实例密集出现”的场景。本文的使用方式以预训练推理为主，不在比赛现场默认执行重新训练。
+
+代码实现中，ImageGrains 根据 Cellpose 版本加载相应预训练模型，并通过批量预测接口最终调用 \texttt{CellposeModel.eval()}。对于第 $j$ 幅输入图像，模型输出标签图
+\begin{equation}
+ M^{(j)}(u,v)\in\{0,1,\ldots,N_j\},
+ \label{eq:instance-mask}
+\end{equation}
+其中 0 表示背景，非零整数分别对应不同颗粒实例。该表示形式保留了像素级轮廓，并能够直接被后续 \texttt{regionprops} 类几何统计处理。当前主流程允许 \texttt{diameter=None} 由模型处理目标尺度，也保留显式粒径尺度、最小实例过滤以及双尺度预测融合等配置；本报告的基线实验将固定配置后进行评价，避免针对每幅测试图像单独调参造成不可复现的性能提升。
+
+分割输出之后只进行必要的数据清理和质量检查，而不采用大量手工轮廓修补来“制造”更理想的结果。ImageGrains 粒度计算阶段可以根据最小粒径和图像边缘位置过滤明显不适合作为完整测量对象的实例，同时保留原始实例掩膜和 composite/overlay 可视化供人工快速检查。这样处理的目的不是否认后处理的价值，而是确保后续精度能够主要归因于可重复的模型和规则，而不是依赖难以量化的逐图人工干预。
+
+本节解决了“哪些像素属于同一颗粒”的问题。下一步需要将每个标签实例压缩为一组具有明确物理和形貌意义的数值特征，使主粒径任务、形貌任务与异常任务能够共享同一中间表示。
+
+\subsection{颗粒几何特征提取}
+\label{sec:geometry-features}
+
+对每个实例掩膜 $M_i$，本文首先提取面积、凸包面积、Crofton 周长、质心、方向以及椭圆长短轴等基础二维量。ImageGrains 默认通过 \texttt{skimage.measure.regionprops} / \texttt{regionprops\_table} 计算这些属性，并将 \texttt{major\_axis\_length} 和 \texttt{minor\_axis\_length} 分别记为颗粒投影的椭圆长轴 $a_i$ 与短轴 $b_i$。对于需要更精细轮廓轴定义的场景，代码还提供基于 convex hull 或 mask outline 的可选轴拟合方式，但其计算开销更大，因此当前竞赛基线优先采用默认椭圆表征。
+
+这些基础量进一步构成三个下游任务共享的几何描述。面积等效直径定义为
+\begin{equation}
+ d_{\mathrm{eq},i}=2\sqrt{\frac{A_i}{\pi}},
+ \label{eq:eq-diameter-geometry}
+\end{equation}
+其表示与颗粒投影具有相同面积的圆的直径。投影长宽比、圆度与凸度分别定义为
+\begin{equation}
+ AR_i=\frac{\min(a_i,b_i)}{\max(a_i,b_i)},\qquad
+ C_i=\frac{4\pi A_i}{P_i^2},\qquad
+ S_i=\frac{A_i}{A_i^{\mathrm{convex}}}.
+ \label{eq:shape-descriptors}
+\end{equation}
+其中 $AR_i$ 描述颗粒投影的伸长程度，$C_i$ 同时受轮廓粗糙度与非圆形程度影响，$S_i$ 则反映实际轮廓相对于凸包的凹陷程度。这些指标均由同一实例掩膜直接计算，其中 $AR_i$、$C_i$ 和 $S_i$ 为无量纲量，因而不会随着 mm/px 尺度的统一缩放而改变。
+
+\begin{table}[htbp]
+\centering
+\caption{颗粒级统一几何表征及其后续用途}
+\label{tab:geometry-features}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+特征 & 定义/来源 & 单位 & 主要用途 \\
+\midrule
+$a_i$ & 椭圆 major axis & mm & 尺寸描述、长宽比、形貌分析 \\
+$b_i$ & 椭圆 minor axis & mm & 筛分等效粒径的主要视觉代理量 \\
+$A_i$ & 实例投影面积 & px$^2$ 或 mm$^2$ & 面积等效直径、圆度、质量模型辅助量 \\
+$P_i$ & Crofton perimeter & px & 圆度与轮廓复杂度 \\
+$A_i^{\mathrm{convex}}$ & 凸包面积 & px$^2$ & 凸度、棱角/凹陷分析 \\
+$d_{\mathrm{eq},i}$ & $2\sqrt{A_i/\pi}$ & mm & 筛分粒径映射中的补充尺度 \\
+$AR_i$ & $\min(a_i,b_i)/\max(a_i,b_i)$ & --- & 针片/细长投影候选判断 \\
+$C_i$ & $4\pi A_i/P_i^2$ & --- & 圆形与不规则边界描述 \\
+$S_i$ & $A_i/A_i^{\mathrm{convex}}$ & --- & 凸度与棱角性描述 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+因此，每个可见颗粒最终被表示为
+\begin{equation}
+ \mathbf{x}_i=(a_i,b_i,A_i,P_i,A_i^{\mathrm{convex}},d_{\mathrm{eq},i},AR_i,C_i,S_i,\ldots).
+ \label{eq:geometry-vector}
+\end{equation}
+这一表示具有两个重要性质：一方面，它保留了直接来源于实例掩膜的可解释物理量，可以通过人工测量或标尺实验逐项检查；另一方面，同一组特征能够同时服务于后续筛分粒径映射、形貌分类和异常判断，避免为不同任务重复构造互相不一致的颗粒表示。
+
+至此，系统已经从现场图像获得了毫米尺度下的逐颗粒二维几何描述。但是，$b_i$ 或 $d_{\mathrm{eq},i}$ 仍然只是图像投影中的几何尺寸，而机械筛分中的粒径由颗粒在筛孔中的三维通过行为定义；同时，机械筛分统计的是各粒级质量而不是颗粒数量。下一章因此转向全文最关键的工程语义转换：如何从上述视觉几何量建立筛分等效粒径，并进一步聚合为与标准机械筛分可直接比较的质量级配。

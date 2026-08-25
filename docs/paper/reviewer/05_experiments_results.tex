@@ -1,0 +1,95 @@
+% ===== 5 实验与结果 =====
+\section{实验设计与阶段性结果}
+\label{sec:r-results}
+
+\subsection{证据协议与评价指标}
+
+本文将实验分为三类证据。\textbf{功能演示}回答处理链能否从真实自然堆积图像稳定地产生实例、毫米几何、级配、形貌和异常输出；\textbf{软件一致性}通过合成单元测试检查数学定义和代码实现是否一致；\textbf{物理精度验证}则必须使用独立 ground truth，才能声明实例精度、筛分精度或形貌/异常准确率。三者不能互相替代，特别是没有机械筛分称量真值时，视觉级配曲线只能视为模型输出而非“准确率”。
+
+最终正式实验应围绕同一物理批次建立配对证据：相机分支产生视觉预测，机械筛分分支产生逐筛质量真值。校准批次用于拟合 $\boldsymbol{\theta},\gamma$；独立测试批次在参数冻结后计算
+\begin{equation}
+ E_{D_p}=\left|\widehat D_p-D_p^{\mathrm{GT}}\right|,
+ \qquad
+ \mathrm{MAE}_{\mathrm{sieve}}=\frac{1}{K}\sum_{k=1}^{K}\left|\widehat P_k-P_k^{\mathrm{GT}}\right|.
+\label{eq:r-metrics}
+\end{equation}
+实例识别使用人工实例 mask 报告 Precision/Recall/F1、IoU 及 merge/split；二维形貌和异常分别使用人工标签报告 Macro-F1 或 Precision/Recall。工程性能按完整 SOP 的 wall-clock time 评价，而不是只统计神经网络前向时间。
+
+\subsection{真实图像功能演示}
+
+当前仓库包含 \texttt{agg\_001}、\texttt{agg\_005} 和 \texttt{agg\_029} 三张自然堆积演示图像，分辨率均为 3024$\times$4032，使用已写入产物的尺度 0.208~mm/px。三张图在当前基线 $\boldsymbol{\theta}=(1,0,0)$、$\gamma=3$ 下共检测 3858 个实例，并生成逐颗粒几何表、筛分等效粒径、质量代理级配、形貌/异常标签及可视化。表\ref{tab:r-demo-main}汇总正常实例口径下的当前输出。由于参数尚未用本赛题配对机械筛分批次校准，这些 $D_p$ 只能解释为\textbf{当前视觉质量代理预测}。
+
+\begin{table}[t]
+\centering
+\caption{三张自然堆积演示样本的当前视觉质量代理输出。}
+\label{tab:r-demo-main}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrrrll}
+\toprule
+样本 & 实例数 & 正常实例 & $D_{10}$ & $D_{50}$ & $D_{90}$ & 主粒级 \\
+ & & & \multicolumn{3}{c}{/ mm} & \\
+\midrule
+\texttt{agg\_001} & 1924 & 1193 & 11.1 & 23.6 & 30.6 & 25--31.5~mm（34.2\%） \\
+\texttt{agg\_005} & 968 & 703 & 15.6 & 27.5 & 38.0 & 25--31.5~mm（29.7\%） \\
+\texttt{agg\_029} & 966 & 520 & 6.7 & 14.6 & 30.6 & 5--10~mm（32.7\%） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+三张场景得到明显不同的预测结构：\texttt{agg\_005} 粗粒尾部更强，\texttt{agg\_029} 则明显偏细，$D_{50}$ 排序为 \texttt{agg\_029}<\texttt{agg\_001}<\texttt{agg\_005}。这支持“同一处理链能将不同真实场景转换为非退化的场景级级配描述”，但不能说明哪条曲线最接近机械筛分。图\ref{fig:r-demo-pair}以 \texttt{agg\_001} 为例并列展示实例层与场景级分布层，使最终数字能够回溯到上游颗粒边界。
+
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
+\caption{实例检测与粒径概览}
+\end{subfigure}\hfill
+\begin{subfigure}{0.48\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{数量与质量代理分布}
+\end{subfigure}
+\caption{\texttt{agg\_001} 的端到端功能演示。右图没有叠加机械筛分真值，因此只用于分析统计口径和系统行为。}
+\label{fig:r-demo-pair}
+\end{figure}
+
+\subsection{数量统计与质量代理：核心行为性证据}
+
+当前最稳定且最重要的观察是：\textbf{数量型粒径分布与质量代理型粒径分布存在显著差异}。表\ref{tab:r-number-mass}给出异常处理前、基于全部检测实例的分位数。三张图的数量型 $D_{50}$ 仅为 5.2--7.6~mm，而采用 $w=d^3$ 后移动到 14.1--27.5~mm；方向在三个场景中一致。
+
+\begin{table}[t]
+\centering
+\caption{数量型与质量代理型分位数比较。该结果证明统计口径影响显著，不证明 $\gamma=3$ 已获得物理校准。}
+\label{tab:r-number-mass}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{数量型 / mm} & \multicolumn{3}{c}{质量代理 / mm} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+样本 & $D_{10}$ & $D_{50}$ & $D_{90}$ & $D_{10}$ & $D_{50}$ & $D_{90}$ \\
+\midrule
+\texttt{agg\_001} & 3.1 & 6.0 & 17.3 & 10.6 & 23.5 & 30.6 \\
+\texttt{agg\_005} & 3.3 & 7.6 & 24.5 & 15.4 & 27.5 & 38.0 \\
+\texttt{agg\_029} & 3.0 & 5.2 & 9.2 & 5.9 & 14.1 & 30.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+该变化可由式\eqref{eq:r-mass}直接解释：自然堆积图中小实例数量很多，但其单颗粒质量贡献较低；少量粗颗粒虽然在个数中占比小，却在幂次权重下显著影响累计质量。以 \texttt{agg\_001} 为例，当前 $<5$~mm 实例占检测数量的 38.0\%，剔除这些实例后质量代理 $D_{50}$ 仅由 23.50~mm 变为 23.56~mm，说明“大量小实例”不必然意味着“大量质量”。相反，错误 merge 产生的少量粗目标会被 $d^{\gamma}$ 放大，因此独立实例边界对高分位质量级配尤为关键。
+
+需要区分两个结论：现有结果足以支持“不能忽略质量口径”；但 $\gamma$ 越大本来就会推动分布向粗粒移动，因此不能仅凭曲线看起来更合理就选定 $\gamma=3$。只有当某个 $\gamma$ 在独立机械筛分测试上降低式\eqref{eq:r-metrics}的误差时，才能把它称为更好的物理质量模型。
+
+\subsection{形貌、异常、软件一致性与运行时间}
+
+当前几何规则在三张图上均产生了非退化的投影形貌分布：普通类占 55.0\%--64.1\%，针片状候选约 14.0\%--20.9\%，圆形与棱角状比例随场景变化。该结果证明形貌分支能够运行，但在没有独立人工标签和厚度真值时不报告“针片状准确率”。异常分支中三张图均未触发 $>50$~mm 或疑似泥团规则，主要触发的是 $<5$~mm 小目标；因此这些演示图同样不能用于估计 oversized 或泥团召回率。
+
+仓库为筛分等效粒径、质量权重、加权分位数、形貌规则、异常优先级和报告生成提供了 27 项合成单元测试，当前记录全部通过。这支持的是“代码实现与数学定义一致”，例如合成校准数据可以恢复接近设定的参数；它不能替代真实图像和机械筛分的外部有效性验证。历史运行记录约为实例分割 17~s、几何测量 9~s、筛分统计 $<1$~s，即算法阶段约 27~s/张，说明计算时间远小于 30~min 窗口；最终仍需用完整现场 SOP 重新计时。
+
+\subsection{最终机械筛分验证与消融}
+
+当前最关键的实验缺口是：三张演示样本没有配对提交逐筛机械称量数据。因此本版本不填写机械筛分准确率，也不把未校准 $D_p$ 作为竞赛精度结论。正式测试应至少建立若干配对批次，其中一部分用于拟合参数，另一部分完全隔离为测试集。独立测试中至少报告：三个 $D_p$ 的绝对/相对误差、逐筛级质量占比或累计通过率误差，以及各批次均值与离散程度。
+
+同时需要用同一测试集完成最小消融：比较 $d=b$、$d=d_{\mathrm{eq}}$ 与式\eqref{eq:r-sieve-d}；比较数量等权、固定 $\gamma$ 与校准 $\gamma$；比较校准前后；比较异常保留与剔除。真正有解释力的结论应表述为“某设计使机械筛分误差降低多少”，而不是“参数变化后曲线移动了多少”。在获得物理真值之前，本文保留这一证据边界，比给出未经验证的高准确率更能反映系统当前真实成熟度。

@@ -22,10 +22,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile technical report
+      - name: Compile modular technical report
         uses: xu-cheng/latex-action@v3
         with:
-          root_file: main.tex
+          root_file: main_v2.tex
           working_directory: docs/paper
           latexmk_use_xelatex: true
           args: -interaction=nonstopmode -file-line-error
@@ -34,16 +34,16 @@ jobs:
         working-directory: docs/paper
         run: |
           echo '== Undefined references / citations =='
-          if grep -Ei 'undefined references|citation.*undefined|reference.*undefined' main.log; then
+          if grep -Ei 'undefined references|citation.*undefined|reference.*undefined' main_v2.log; then
             echo 'LaTeX has unresolved references or citations.'
             exit 1
           fi
           echo '== Overfull boxes =='
-          grep -E 'Overfull \\hbox|Overfull \\vbox' main.log || true
+          grep -E 'Overfull \\hbox|Overfull \\vbox' main_v2.log || true
 
       - name: Upload compiled PDF
         uses: actions/upload-artifact@v4
         with:
-          name: technical-report-pdf
-          path: docs/paper/main.pdf
+          name: technical-report-v2-pdf
+          path: docs/paper/main_v2.pdf
           if-no-files-found: error

@@ -1,636 +1,95 @@
 % !TeX program = xelatex
-% 混凝土骨料颗粒智能筛分比拼 — 技术报告（自然堆积赛道）
-% 编译: latexmk -xelatex main.tex  或  make
-% 引擎: XeLaTeX + ctexart + gbt7714-numerical
+% 混凝土骨料颗粒智能筛分比拼 — 正式评委阅读版
+% 编译: latexmk -xelatex main.tex
 
-\documentclass[UTF8,a4paper,12pt,fontset=fandol]{ctexart}
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
 
-% --- 页面与字体 ---
-\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage[a4paper,top=2.05cm,bottom=2.05cm,left=2.15cm,right=2.15cm]{geometry}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{booktabs}
-\usepackage{longtable}
 \usepackage{amsmath,amssymb}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{enumitem}
 \usepackage{float}
 \usepackage{hyperref}
-\usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning}
 \usepackage[numbers,sort&compress]{natbib}
-\usepackage{tcolorbox}
-\tcbuselibrary{breakable,skins}
-\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
-\usepackage{cleveref}
-\usepackage[htt]{hyphenat}
-\usepackage{seqsplit}
 \usepackage{array}
-\usepackage{siunitx}
-\sisetup{uncertainty-mode=separate, per-mode=symbol, mode=match, propagate-math-font=true}
 \usepackage[section]{placeins}
-\usepackage{amsthm}
-\captionsetup{font=footnotesize, labelfont=bf, width=0.92\linewidth, justification=raggedright, singlelinecheck=false}
 
+\captionsetup{font=footnotesize,labelfont=bf,width=0.94\linewidth,justification=raggedright,singlelinecheck=false}
 \graphicspath{{figures/}{../../demo_data/samples/results/}{../../demo_data/samples/}{../assets/}}
-
-\theoremstyle{definition}
-\newtheorem{definition}{定义}[section]
-\newtheorem{assumption}{假设}[section]
-\Crefname{figure}{图}{图}
-\Crefname{table}{表}{表}
-\crefname{table}{表}{表}
-\crefname{figure}{图}{图}
-\newcommand{\crefpairconjunction}{、}
-\newcommand{\crefrangeconjunction}{～}
-\newcommand{\creflastconjunction}{、}
-\Crefname{equation}{式}{式}
-\Crefname{section}{节}{节}
+\setlist{nosep,leftmargin=1.8em}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\intextsep}{7pt plus 2pt minus 2pt}
+\setlength{\abovedisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\emergencystretch}{8em}
+\setcounter{tocdepth}{2}
+\sloppy
 
 \hypersetup{
-  colorlinks=true, linkcolor=blue!60!black, citecolor=green!50!black, urlcolor=blue!70!black,
-  pdftitle={混凝土骨料颗粒智能筛分技术报告（自然堆积赛道）},
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black,
+  pdftitle={混凝土骨料颗粒智能筛分技术报告},
   pdfauthor={匿名},
   breaklinks=true
 }
-% --- 版式微调：抑制右侧溢出 ---
-\setlength{\emergencystretch}{10em}
-\sloppy
-\hyphenpenalty=500
-\tolerance=1000
-
-\lstset{
-  basicstyle=\footnotesize\ttfamily, keywordstyle=\color{blue!70!black},
-  commentstyle=\color{green!40!black}, stringstyle=\color{orange!70!black},
-  breaklines=true, breakatwhitespace=false, breakautoindent=true,
-  numbers=left, numberstyle=\tiny\color{gray}, frame=single, tabsize=2,
-  columns=fullflexible, keepspaces=true, linewidth=\linewidth, xleftmargin=1em
-}
-
-% --- 标题信息（匿名） ---
-\title{\bfseries 混凝土骨料颗粒智能筛分技术报告\\ \large 自然堆积赛道：基于 Cellpose-SAM 的二维视觉筛分与质量加权预测}
-\author{}
-\date{}
 
 \begin{document}
-\maketitle
 
-% ===== 摘要 =====
-\begin{abstract}
-混凝土骨料的粒径分布、形貌与含泥量直接影响混凝土工作性与力学性能，传统机械筛分按 \texttt{GB/T 14685}、\texttt{JGJ 52}、\texttt{ASTM C136} 逐级称重，准确但离线、耗时、无法在线闭环。赛题“自然堆积”赛道要求在 $\le 30$\,min 内以非人工方式完成精细识别、粒径 $D_{10}/D_{50}/D_{90}$、形状分类与 $>50$\,mm 异物/泥团检测，且以质量分布为准评分，带来三重鸿沟：粘连遮挡、二维投影与筛孔尺寸非线性、数量分布与质量分布量纲失配（实测数量 $D_{50}=6.0$\,mm vs 质量 $D_{50}=23.5$\,mm，差近 4 倍）。
+% -------------------- 封面 --------------------
+% 封面不建立 PDF page anchor，避免前置 Roman 页码与正文 Arabic 页码重置时产生重复锚点。
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{2.2cm}
+{\zihao{2}\bfseries 混凝土骨料颗粒智能筛分比拼\par}
+\vspace{1.2cm}
+{\zihao{-0}\bfseries 技术报告\par}
+\vspace{0.8cm}
+{\zihao{2} 自然堆积赛道\par}
+\vspace{0.5cm}
+{\zihao{3}\bfseries 基于实例感知与可解释级配映射的视觉筛分方法\par}
+\vfill
+{\zihao{4} 匿名提交\par}
+\vspace{1.2cm}
+\end{titlepage}
 
-本报告提出“图像$\to$分割$\to$测量$\to$筛分等效$\to$质量加权”全链路：以 ImageGrains 2.0 的 Cellpose-SAM（SAM 融合架构）预训练模型 \texttt{IG2\_full\_set\_cp\_SAM} 为零样本分割基座，结合筛分等效粒径 $d=\theta_1 b+\theta_2 d_{\mathrm{eq}}+\theta_3$ 与质量加权 $w=d^{\gamma}$（默认 $\gamma=3$，体积$\propto d^{3}$）将数量分布显式校准为质量分布，并提供 $\ge 5$ 批筛分真值的差分进化拟合器；形貌与异常采用长宽比/圆度/凸度阈值规则，阈值集中可标定。在 3 张代表性自然堆积样本（$3024\times4032$，$0.208$\,mm/px，$520$--$1924$ 颗粒，覆盖细/中/粗）上：剔除异常后质量加权 $D_{50}=14.6/23.6/27.5$\,mm，单张推理 $17+9+<1$\,s，满足 $\le 30$\,min；消融 $\gamma=1\!\to\!3$ 时 $D_{50}$ 单调右移，$\theta$ 微调 $<0.5\%$，剔除仅洁净口径。
-
-\medskip\noindent\textbf{关键词：}混凝土骨料；智能筛分；Cellpose-SAM；实例分割；级配曲线；质量加权；形貌分类；异常检测
-
-\medskip\noindent\textbf{Abstract:} \textit{We present a two-step visual sieving pipeline for naturally-piled concrete aggregates. Building on ImageGrains 2.0 with a Cellpose-SAM backbone, a sieve-equivalent diameter $d=\theta_{1}b+\theta_{2}d_{\mathrm{eq}}+\theta_{3}$ and mass weight $w=d^{\gamma}$ ($\gamma=3$) explicitly calibrates count-based distributions to mass-based grading curves evaluated by \texttt{GB/T 14685}. Three field samples ($3024\times4032$, $0.208$\,mm/px, $520$--$1924$ grains) cover fine/medium/coarse gradings with mass-weighted $D_{50}=14.6/23.6/27.5$\,mm.}
-
-\end{abstract}
-
-\newpage
-
-% ===== Executive Summary + Checklist（双框，评委 30 秒抓分） =====
-\begin{tcolorbox}[colback=blue!3,colframe=blue!40,title=Executive Summary --- 30 秒抓住本报告贡献, width=\linewidth, breakable]
-\textbf{基座：} ImageGrains 2.0 + Cellpose-SAM \texttt{IG2\_full\_set\_cp\_SAM} 零样本粘连分离，无需重训，2--3 s/张（Graphics Processing Unit，GPU）。\\
-\textbf{口径：} 筛分等效 $d=\theta_{1}b+\theta_{2}d_{\mathrm{eq}}+\theta_{3}$ + 质量 $w=d^{\gamma}$ ($\gamma=3$) 将数量 $D_{50}=5$--$7$\,mm 显式校准为质量 $D_{50}=14$--$27$\,mm，对标机械筛分；提交 \texttt{SceneSummary.normal\_only}（剔除异常后质量加权）。\\
-\textbf{证据：} 3 张实测（细 $5$--$10$:32.7\% / 中 $25$--$31.5$:34.2\% / 粗 $25$--$31.5$:29.7\%+\,$>40$:5\%）见 \cref{fig:detection,fig:gsd}；$\gamma=1\!\to\!3$ 单调 $10.1\!\to\!23.5$\,mm 见 \cref{tab:ablation}。\\
-\textbf{闭环：} \texttt{python -m imagegrains}$\to$\texttt{python -m aggregate\_screening} 两步 Command Line Interface（CLI）一键，11 类产物与 8 张可视化，$<14$\,min 满足 $\le30$\,min 现场。
-\end{tcolorbox}
-
-\begin{tcolorbox}[colback=green!3,colframe=green!40,title=评审关注点 Checklist --- 任务 $\to$ 证据 $\to$ 定位, width=\linewidth, breakable]
-\centering\footnotesize\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{3.0cm}}
-\toprule
-赛题任务 & 一句话证据 & 定位 \\
-\midrule
-1 精细识别 & 三样本 $1924/968/966$ 颗粒，粘连分离见图 & \cref{fig:detection} \S3 \\
-2 粒径分析 & 质量 $D_{50}$ 比数量大 $2$--$3$ 倍，质量口径对标筛分 & \cref{fig:gsd,tab:main-results} \S4 \\
-3 形状分类 & 针片 $14$--$20.9\%$ 圆 $6.6$--$11\%$ 棱角 $11$--$17.6\%$ & \cref{fig:shape,tab:shape-stats} \S5 \\
-4 异常检测 & $>50$/$<5$/泥团 $40$--$50\&S<0.85$，剔除后 $D_{10}\,10.6\!\to\!11.1$ & \cref{tab:anomaly-stats} \S6 \\
-标定校准 & \texttt{infer\_resolution} 中位数 + $\theta/\gamma$ 差分进化 & \cref{alg:calib} \S7 \\
-现场 $\le30$min & 两步 CLI + 5 步 Standard Operating Procedure（SOP） 甘特，$17+9+<1$\,s/张 & \S9 \\
-\bottomrule
-\end{tabular}
-\end{tcolorbox}
-
+% -------------------- 前置部分 --------------------
+\hypersetup{pageanchor=true}
+\pagenumbering{Roman}
+\input{reviewer/00_abstract}
 \clearpage
 \tableofcontents
 \clearpage
 
-% ===== 1 引言 =====
-\section{引言}
-\subsection{任务背景}
-赛题要求在仓库自然堆积或传送带场景下，以非人工方式完成“精细识别—粒径分析—形状分类—异常检测”四任务\cite{gb14685-2022,jgj52-2006}，现场采集与调试 $\le 30$\,min，评分以标准筛分（质量分布）为准，兼顾识别准确率、算法创新性与答辩表现。
+% -------------------- 正文 --------------------
+\pagenumbering{arabic}
+\input{reviewer/01_problem}
+\input{reviewer/02_framework}
+\input{reviewer/03_visual_measurement}
+\input{reviewer/04_sieve_mapping_final}
+\input{reviewer/05_results_final}
+\input{reviewer/06_deployment_final}
+\input{reviewer/07_conclusion_final}
 
-传统筛分按 \texttt{GB/T 14685-2022}、\texttt{JGJ 52}、\texttt{ASTM C136} 以 $5$/$10$/$16$/$20$/$25$/$31.5$/$40$\,mm 筛组称重得各粒级质量占比与 $D_{10}$/$D_{50}$/$D_{90}$，准确但耗时、离线、无法在线闭环。
-
-\subsection{自然堆积的特殊挑战}
-相对传送带单层平铺，自然堆积存在三重难点：(1) 颗粒间遮挡与粘连导致漏分/过分割；(2) 单目俯视仅得二维投影，短轴 $b$ 与筛孔通过尺寸非线性相关；(3) 数量分布与质量分布量纲不同，大颗粒质量主导而数量稀少，直接用数量 $D_{50}$ 对标筛分会系统性偏细（本报告 demo 中数量 $D_{50}=6.0$\,mm vs 质量 $D_{50}=23.5$\,mm，差近 4 倍）。
-
-\subsection{本文贡献}
-\begin{itemize}[leftmargin=2em]
-\item \textbf{分割基座选型}：复用 ImageGrains 2.0\cite{mair2026imagegrains2} 的 Cellpose-SAM\cite{pachitariu2025cellposeSAM} 预训练模型，无需重训即获强泛化粘连分离；
-\item \textbf{质量加权校准链}：显式 $d(\theta)$--$w(\gamma)$--加权分位数--粒级占比四步，将视觉几何转为筛分语义，并提供 $ \ge 5$ 批筛分真值的差分进化拟合器；
-\item \textbf{可解释规则层}：形貌与异常均用阈值规则（长宽比/圆度/凸度），阈值集中可标定；
-\item \textbf{工程闭环}：两步 CLI + 11 件产物 + 30\,min SOP， \texttt{aggregate\_screening} 子包不改上游源码，27 项合成测试通过。
-\end{itemize}
-
-% ===== 2 相关工作 =====
-\section{相关工作}
-\label{sec:related}
-
-赛题本质是“二维图像$\to$筛分质量级配”的跨域校准，需同时解决分割泛化与统计口径对齐。现有工作分三类：
-
-\begin{table}[htbp]
-\centering\caption{三类技术路线对比（本报告选 \textbf{Cellpose-SAM + 质量加权}）}
-\label{tab:related}
-\small
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{4.0cm}}
-\toprule
-路线 & 代表 & 优点 & 局限（赛题视角） \\
-\midrule
-传统阈值/分水岭 & 形态学+分水岭 & 无需标注、快 & 对光照/阴影/粘连敏感，漏分 $>20\%$ \cite{blottPye2008shape,barrett1980shape} \\
-检测分割 & YOLO-seg\cite{redmon2016yolo} / Mask R-CNN\cite{he2017maskRCNN} / \texttt{SediNet}\cite{buscombe2020sedinet} & 实时、可端到端 & 需大量骨料掩膜标注；重叠颗粒边界粗；跨域泛化差 \cite{zeng2022automation} \\
-SAM 泛化 & SAM\cite{kirillov2023segmentAnything} $\to$ Cellpose-SAM\cite{pachitariu2025cellposeSAM} $\to$ ImageGrains 2.0\cite{mair2026imagegrains2} & Vision Transformer (ViT) 长程注意力粘连分离强；IG2 多源多粒径预训练零样本可用 & 需 GPU；2D 投影$\to$筛孔仍需校准 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{级配校准}：早期 \texttt{GRADISTAT}\cite{blott2001gradistat} 仅做数量统计；\cite{maiti2017massModel} 提出 $W_{\mathrm{reg}}=0.0223+0.719W_{\mathrm{major}}$ 回归，证实短轴 $b$ 最接近筛孔 $D_{50}$（误差 $0.4\%$）。\cite{coenen2022learningToSieve} 以扩张卷积端到端预测 9 类级配，讨论 \SI{2.0}{px/mm} 与 \SI{2.8}{px/mm} 的人机混淆；\cite{yang2023pointCloud} 指出 2D 缺厚度会导致系统偏差，改用线结构光 3D 点云；\cite{fan2021multiview} 以多视角融合提升稳健性。本报告取折中：单目 2D 与显式物理校准 $d(\theta)/w(\gamma)$ 相结合。
-
-\textbf{形貌与异常}：经典 \cite{wadell1932volume,wadell1933sphericity,krumbein1941shape,powers1953roundness} 定义球度/圆度，\cite{iso9276-6_2008} 规范 $C=4\pi A/P^{2}$，\cite{en933-3_2012} 针片指数 $\mathrm{FI}$；\cite{barrett1980shape} 综述指出单一指标不足，需 $AR/C/S$ 联判。本报告以 \texttt{MorphThresholds} \cite{blottPye2008shape} 落地四分类，并以 $40$--$50$\,mm $\&\,S<0.85$ 几何兜底泥团（待 \texttt{crop} 分类器升级）。
-
-% ===== 3 总体方案 =====
-\section{总体方案设计}
-
-\subsection{系统架构}
-图\ref{fig:arch}给出四段式流水线，严格对应 \texttt{docs/architecture.md} 与 \texttt{data-flow.md}。
-
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[scale=0.88, transform shape, node distance=1.0cm, auto,
-  block/.style={rectangle, draw, rounded corners, fill=blue!8, minimum height=0.95cm, minimum width=2.45cm, align=center, font=\footnotesize},
-  arrow/.style={->, thick}]
-\node[block] (img) {图像目录\\ \texttt{jpg/png/tif}};
-\node[block, right=1.2cm of img] (seg) {1. 分割\\ \texttt{segmentation\_helper}\\ Cellpose-SAM};
-\node[block, right=1.2cm of seg] (geo) {2. 几何测量\\ \texttt{grainsizing}\\ \texttt{ell: b/a}};
-\node[block, right=1.2cm of geo] (sieve) {3. 筛分等效\\ \texttt{sieve\_equivalent}\\ $d,w,D_{p}$};
-\node[block, below=1.2cm of sieve] (report) {4. 汇总\\ \texttt{report+app}\\ \texttt{SceneSummary}};
-\draw[arrow] (img) -- (seg); \draw[arrow] (seg) -- (geo); \draw[arrow] (geo) -- (sieve); \draw[arrow] (sieve) -- (report);
-\node[below=0.28cm of img, font=\footnotesize\color{gray}] {$3024\times4032$};
-\node[below=0.28cm of seg, font=\footnotesize\color{gray}] {\texttt{*\_pred.tif}};
-\node[below=0.28cm of geo, font=\footnotesize\color{gray}] {\texttt{*\_grains.csv}};
-\node[below=0.28cm of sieve, font=\footnotesize\color{gray}] {\texttt{*\_re\_scaled.csv}};
-\draw[arrow, dashed, color=orange!80!black] (report.west) -- ++(-0.6,0) |- (sieve.south) node[pos=0.25, left, font=\footnotesize\color{orange!70!black}] {校准回路 $\theta/\gamma$};
-\end{tikzpicture}
-\caption[四步流水线]{四步流水线：分割、几何测量、筛分等效与质量加权、汇总。虚线为需筛分真值的 $\theta/\gamma$ 校准回路。}
-\label{fig:arch}
-\end{figure}
-\FloatBarrier
-
-\subsection{模块划分}
-\begin{table}[htbp]
-\centering\footnotesize\caption{模块职责（对应 \texttt{src/aggregate\_screening/}）}\label{tab:modules}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{7.0cm}}
-\toprule
-模块 & 关键类/函数 & 职责 \\
-\midrule
-\texttt{\_columns.py} & 常量 & 列名单一来源（\texttt{ell: b-axis (mm/px)} 等）\\
-\texttt{sieve\_equivalent.py} & \texttt{SieveAnalysis}, \texttt{weighted\_percentiles} & $d$--$w$--$D_{10/50/90}$--粒级占比，\texttt{fit\_calibration} \\
-\texttt{morphology.py} & \texttt{MorphThresholds} & 长宽比/圆度/凸度$\to$四类形貌 \\
-\texttt{anomaly.py} & \texttt{FOREIGN\_MIN}, \texttt{MUD\_BAND} & $>50$/$<5$/泥团三档异常 \\
-\texttt{report.py} & \texttt{SceneSummary} & 数量 vs 质量对照、剔除异常后口径、消融表 \\
-\texttt{app.py} & CLI & \texttt{python -m aggregate\_screening} 一键出图 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{设计约束}
-不改 \texttt{src/imagegrains/} 公开签名与输出列名；不引新重型依赖（仅 \texttt{scipy} 差分进化）；传送带跟踪、CT 三维、含泥量回归列为非目标，聚焦自然堆积的“质量加权”主矛盾。
-
-% ===== 3 精细识别 =====
-\section{精细识别：实例分割}
-
-\subsection{基座选择：为何用 Cellpose-SAM}
-对比三条技术路线：(1) 传统阈值/分水岭对光照与粘连敏感；(2) 目标检测类 YOLO\cite{redmon2016yolo}/Mask R-CNN\cite{he2017maskRCNN}需大量骨料标注且对重叠颗粒的掩膜边界粗；(3) Cellpose-SAM\cite{pachitariu2025cellposeSAM}以 ViT-SAM 为骨干，在细胞分割上已验证超人泛化，ImageGrains 2.0\cite{mair2026imagegrains2}将其迁移至砾石/骨料，IG2 数据集多源多粒径，零样本即可分离自然堆积粘连（图\ref{fig:detection}）。
-
-\begin{figure}[htbp]
-\centering
-% 3×3 布局：3 样本 × 3 视图（原图 / 检测三联 / 轴叠加），每行一样本
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_001.jpg}
-\caption*{\footnotesize agg\_001 原图}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption*{\footnotesize agg\_001 检测}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_001 轴}\end{subfigure}\\
-\vspace{0.4em}
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_005.jpg}
-\caption*{\footnotesize agg\_005 原图}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption*{\footnotesize agg\_005 检测}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_005 轴}\end{subfigure}\\
-\vspace{0.4em}
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_029.jpg}
-\caption*{\footnotesize agg\_029 原图}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption*{\footnotesize agg\_029 检测}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_029 轴}\end{subfigure}
-\caption{任务1 3$\times$3 检测矩阵：3 样本（细/中/粗，1924/968/966 颗粒）$\times$ 3 视图（原图｜检测三联｜轴叠加）。粘连分离可目检，比例尺见轴图右下。}
-\label{fig:detection}
-\end{figure}
-
-\subsection{实现细节}
-入口 \texttt{\seqsplit{segmentation\_helper.predict\_folder}} 调用 \texttt{CellposeModel.eval}（参数 \texttt{diameter}/\texttt{min\_size}），默认 \texttt{diameter=None} 自适应、\texttt{min\_size}=15\,px$^{2}$ 仅滤极小噪声；输出 \texttt{*\_pred.tif}（$0$ 为背景、$1\ldots N$ 为实例）与 \texttt{*\_composite.png}。关键参数见\cref{tab:seg-params}。
-
-\begin{table}[htbp]
-\centering\caption{分割关键参数}\label{tab:seg-params}
-\begin{tabular}{lll}
-\toprule
-参数 & 默认 & 说明 \\
-\midrule
-\texttt{--resolution} & 必填 & mm/px，决定所有 mm 结果 \\
-\texttt{--diameter} & None & 目标粒径 px，$\approx$物理粒径/resolution \\
-\texttt{--gpu} & True & GPU 约 $2$--$3$\,s/张，CPU 慢 10 倍 \\
-\texttt{--min\_size} & $0$ & 噪声面积阈值 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{难点对策}
-\textbf{粘连}：SAM 的长程注意力优于 Convolutional Neural Network（CNN）局部感受野；\textbf{阴影}：深色托盘+漫射光+ \texttt{--diameter} 微调 $\pm10$\,px；\textbf{漏检小颗粒}：保留 $<5$\,mm 噪声档而非直接丢弃，供后续质量加权时自然降权。
-
-% ===== 4 粒径分析 =====
-\section{粒径分析：从像素到筛分语义}
-
-\subsection{几何测量}
-\texttt{grainsizing.batch\_grainsize} 经 \texttt{ell\_stats}（\texttt{regionprops}）取 \texttt{area}, \texttt{area\_convex}, \texttt{perimeter\_crofton}, \texttt{orientation}，再经 \texttt{fit\_grain\_axes} 拟合椭圆长短轴 $a$/$b$。输出 \texttt{*\_pred\_grains.csv} 含 \texttt{ell: b-axis (px)} 等 20 列，\texttt{scale\_grains} 按 \texttt{resolution} 得 \texttt{ell: b-axis (mm)}$=b_{\mathrm{px}}\times$\texttt{res}，而 \texttt{area} 保持 px$^2$（需自乘 $\mathrm{res}^2$ 转 mm$^2$）。
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.85\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption{任务2长短轴叠加（青=长轴 $a$，红=短轴 $b$）与右下比例尺（mm 可读），颗粒数 $1924$。}
-\label{fig:axes}
-\end{figure}
-
-\subsection{筛分等效粒径与质量加权}
-\begin{definition}[筛分等效粒径]
-二维 $b$ 轴最接近筛孔通过尺寸，但面积等效直径 $d_{\mathrm{eq}}=2\sqrt{A/\pi}$ 含形状信息，定义
-\begin{equation}
-d = \theta_1 b + \theta_2 d_{\mathrm{eq}} + \theta_3,\quad
-w = d^{\gamma},\quad \gamma=3\;(\text{体积}\propto d^{3})
-\label{eq:sieve}
-\end{equation}
-若 $A$ 仍为 $\mathrm{px}^{2}$，则 $d_{\mathrm{eq}}=2\sqrt{A_{\mathrm{px}}\,\mathrm{res}^{2}/\pi}$。默认 $\theta=(1,0,0)$ 即 $d=b$，常数项 $\theta_{3}$ 吸收系统偏差。
-\end{definition}
-\begin{assumption}[质量加权]
-颗粒质量 $m\propto d^{3}$ 且密度均一，则质量分布权重 $w=d^{\gamma}$，归一后常数消去；$\gamma$ 偏离 $3$ 反映形状随尺寸的变化。
-\end{assumption}
-
-加权分位数为阶梯逆 CDF：
-\begin{equation}
-F(d)=\frac{\sum_i w_i \mathbf{1}_{d_i\le d}}{\sum_i w_i},\quad D_{p}=F^{-1}(p),\;p=10,50,90
-\end{equation}
-粒级占比按筛组 $5$/$10$/$16$/$20$/$25$/$31.5$/$40$\,mm 分桶，$w$ 求和归一，含 $<5$/$>40$ 边界桶。
-
-\subsection{双口径设计与校准}
-工程层同时输出\emph{数量}与\emph{质量}两套 $D_{10/50/90}$，并以“剔除异常后质量加权”为提交口径（\texttt{SceneSummary.normal\_only}），数量口径仅作对照，回应赛题“以标准筛分为准”的双重语义。
-
-有 $\ge5$ 批筛分真值时，\texttt{fit\_calibration} 以差分进化最小化
-\begin{equation}
-\mathcal{L}=\mathrm{mean}\left[0.25\,r_{10}^2+0.5\,r_{50}^2+0.25\,r_{90}^2\right],\;
-r_p=( \hat D_p-D_p)/\max(D_p,10^{-6})
-\end{equation}
-在 $\theta_1\!\in\![0,3],\theta_2\!\in\![0,3],\theta_3\!\in\![-20,20],\gamma\!\in\![1,5]$ 内无梯度优化（阶梯不可导）。合成数据可恢复真参数，27 项测试通过。
-
-\subsection{可视化}
-图\ref{fig:gsd}为累计曲线与粒级柱状图对，数量曲线系统性偏细，质量曲线右移即为筛分语义。
-
-\begin{figure}[htbp]
-\centering
-% 3×2 布局：3 样本 × 2 视图（GSD 累计+柱状 / 轴叠加验证）
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
-\caption*{\footnotesize agg\_029 $D_{50}=14.6$}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
-\caption*{\footnotesize agg\_001 $D_{50}=23.6$}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
-\caption*{\footnotesize agg\_005 $D_{50}=27.5$}\end{subfigure}\\
-\vspace{0.4em}
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_029 轴验证}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_001 轴验证}\end{subfigure}\hfill
-\begin{subfigure}{0.30\textwidth}
-\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
-\caption*{\footnotesize agg\_005 轴验证}\end{subfigure}
-\caption{任务2 3$\times$2 粒径矩阵：上排为累计通过率与粒级质量占比（数量 vs 质量），下排为对应轴叠加验证。质量 $D_{50}$ 比数量大 2--3 倍。}
-\label{fig:gsd}
-\end{figure}
-
-% ===== 5 形状分类 =====
-\section{形状分类（可选加分项）}
-
-单目俯视无厚度，仅做投影形貌四分类（表\ref{tab:shape-rule}），指标 $AR=b/a$, $C=4\pi A/P^2$, $S=A/A_{\mathrm{convex}}$，阈值 \texttt{MorphThresholds} 集中可标定。
-
-\begin{table}[htbp]
-\centering\caption{形貌规则（优先级：棱角$>$圆形$>$针片$>$普通）}\label{tab:shape-rule}
-\begin{tabular}{lll}
-\toprule
-类别 & 规则 & 语义 \\
-\midrule
-针片状候选 & $AR<0.5$ & 扁长投影 \\
-圆形 & $C>0.85\,\&\,S>0.95\,\&\,AR>0.8$ & 近圆且凸 \\
-棱角状 & $C<0.6$ 或 $S<0.9$（非针片） & 凹凸/尖角 \\
-普通 & 其余 & —\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-图\ref{fig:shape}为四类高亮，3 样本统计见表\ref{tab:shape-stats}：针片 $14$--$20.9\%$、圆 $6.6$--$11\%$、棱角 $11$--$17.6\%$，与破碎骨料破碎面多的先验一致。
-
-\begin{figure}[htbp]
-\centering
-% 2×2 布局：针片 / 圆形 / 棱角 / 普通
-\begin{subfigure}{0.46\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_needle_flaky.png}
-\caption*{\footnotesize 针片 313 颗}\end{subfigure}\hfill
-\begin{subfigure}{0.46\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_round.png}
-\caption*{\footnotesize 圆形 154 颗}\end{subfigure}\\
-\vspace{0.4em}
-\begin{subfigure}{0.46\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_angular.png}
-\caption*{\footnotesize 棱角 316 颗}\end{subfigure}\hfill
-\begin{subfigure}{0.46\textwidth}
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_regular.png}
-\caption*{\footnotesize 普通 1141 颗}\end{subfigure}
-\caption{形貌 2$\times$2 四类高亮（agg\_001，$n=1924$）。阈值见 \cref{tab:shape-rule}。}
-\label{fig:shape}
-\end{figure}
-
-\begin{table}[htbp]
-\centering\caption{3 样本形貌统计（\%）}\label{tab:shape-stats}
-\begin{tabular}{lcccc}
-\toprule
-样本 & 针片 & 圆形 & 棱角 & 普通 \\
-\midrule
-agg\_001 ($n=1924$) & 16.3 & 8.0 & 16.4 & 59.3 \\
-agg\_005 ($n=968$)  & 20.9 & 6.6 & 17.6 & 55.0 \\
-agg\_029 ($n=966$)  & 14.0 & 11.0 & 11.0 & 64.1 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% ===== 6 异常检测 =====
-\section{异常检测}
-
-\subsection{规则}
-\begin{table}[htbp]
-\centering\caption{异常三档（按 $d$ mm）}\label{tab:anomaly}
-\begin{tabular}{lll}
-\toprule
-类别 & 判定 & 阈值来源 \\
-\midrule
-大块异物 & $d>50$ & \texttt{FOREIGN\_MIN} \\
-过小噪声 & $d<5$ & \texttt{NORMAL\_MIN} \\
-疑似泥团 & $40<d\le50$ 且 $S<0.85$ & \texttt{MUD\_BAND}+凸度 \\
-\bottomrule
-\end{tabular}
-\end{table}
-判定顺序 oversized $>$ suspect\_mud $>$ undersized $>$ normal，泥团为几何兜底（颜色/纹理分类器待升级）。
-
-\subsection{结果}
-3 样本均无 $>50$\,mm 异物与泥团，$<5$\,mm 噪声 $27$--$46\%$（表\ref{tab:anomaly-stats}），数量占比高但质量加权后权重极低，剔除后 $D_{10}$ 从 $10.6\!\to\!11.1$\,mm（agg\_001）微升，符合“数量噪声不主导质量”的设计。
-
-\begin{table}[htbp]
-\centering\caption{异常统计}\label{tab:anomaly-stats}
-\begin{tabular}{lcccc}
-\toprule
-样本 & 正常 & $>50$ & $<5$ & 泥团 \\
-\midrule
-agg\_001 & 62.0\% (1193) & 0 & 38.0\% (731) & 0 \\
-agg\_005 & 72.6\% (703)  & 0 & 27.4\% (265) & 0 \\
-agg\_029 & 53.8\% (520)  & 0 & 46.2\% (446) & 0 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% ===== 7 尺度标定与参数校准 =====
-\section{尺度标定与参数校准}
-\label{sec:calib}
-
-\subsection{分辨率：全链唯一锚点}
-\texttt{--resolution} mm/px 决定所有 mm 结果。\texttt{*\_re\_scaled.csv} 同时含 px/mm 双列时 \texttt{infer\_resolution} 取 $b_{\mathrm{mm}}/b_{\mathrm{px}}$ 中位数自动推断（见 \texttt{sieve\_equivalent.py:224})；纯 px 必传值。\cref{fig:scale} 给出链式溯源：标尺/ArUco（AR 标记） $\to$ \texttt{resolution} $\to$ \texttt{scale\_grains} $\to$ CSV 双列 $\to$ 推断。\textbf{推断不是免标定}：\texttt{re\_scaled} 的 mm 列已含第1步标定，推断仅反推。
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[node distance=0.9cm, auto,
-  block/.style={rectangle, draw, rounded corners, fill=green!8, minimum height=0.8cm, minimum width=1.95cm, align=center, font=\scriptsize}]
-\node[block] (a) {标尺/ArUco \\ $30$\,mm};
-\node[block, right=1.0cm of a] (b) {\texttt{--resolution} \\ mm/px};
-\node[block, right=1.0cm of b] (c) {\texttt{scale\_grains} \\ $b_{\mathrm{mm}}=b_{\mathrm{px}}\!\times\!\mathrm{res}$};
-\node[block, right=1.0cm of c] (d) {CSV 双列 \\ px/mm};
-\node[block, right=1.0cm of d] (e) {\texttt{infer\_resolution} \\ 中位数};
-\draw[->, thick] (a)--(b); \draw[->, thick] (b)--(c); \draw[->, thick] (c)--(d); \draw[->, thick, dashed, orange!80!black] (d)--(e);
-\end{tikzpicture}
-\caption{尺度溯源链（实线需现场标定，虚线为自动推断）。ArUco 单应与畸变校正为待办，当前 demo 用场景已知 $0.208$\,mm/px。}
-\label{fig:scale}
-\end{figure}
-
-\subsection{参数校准：差分进化}
-有 $\ge5$ 批筛分真值时 \texttt{\seqsplit{fit\_calibration}} 以无梯度差分进化最小化加权相对误差（阶梯逆 CDF 不可导）：
-\setlength{\algomargin}{0em}
-\SetAlgoVlined
-\SetAlFnt{\tiny}
-\SetAlCapFnt{\small}
-\SetAlCapNameFnt{\small}
-\begin{tcolorbox}[colback=gray!5,colframe=gray!40,title=算法\,1\ \ 质量加权校准, fonttitle=\small\bfseries, width=\linewidth]
-\footnotesize
-\textbf{输入：} $B=\{b_{\mathrm{mm}},A_{\mathrm{px}},\mathrm{res}\}_{k}$ 与 $T=\{(D_{10},D_{50},D_{90})_{k}\}_{k=1}^{K}$，$K\ge5$；搜索空间 $\theta_{1},\theta_{2}\in[0,3]$，$\theta_{3}\in[-20,20]$，$\gamma\in[1,5]$。\\
-\textbf{输出：} $\hat\theta,\hat\gamma$ 与 $\mathcal{L}_{\min}$。\\
-\textbf{损失：} $\mathcal{L}=\mathrm{mean}_{k}[0.25r_{10}^{2}+0.5r_{50}^{2}+0.25r_{90}^{2}]$，$r_{p}=(\hat D_{p}-D_{p})/\max(D_{p},10^{-6})$。\\
-\textbf{流程：} 初始化种群 $15\times4$，变异 $F=0.8$，交叉 $CR=0.7$；迭代至 $1000$ 次或 $\mathrm{tol}<10^{-8}$，以式\eqref{eq:sieve} 求 $\hat D_{p}$ 并更新 $\mathcal{L}$。\\
-\textbf{返回：} 最优 $(\hat\theta,\hat\gamma)$ 填入 \texttt{--theta/--gamma}。
-\label{alg:calib}
-\end{tcolorbox}
-合成数据（真值 $\theta=(0.6,0.4,1.0),\gamma=2.5$，$6$ 批）可恢复 $|\hat\gamma-\gamma|<0.3$，$27$ 项测试通过。误差主因仍是 $\theta/\gamma$ 未校准，当前基线为经验值，待现场多批校准后可将主粒级误差压至 $<10\%$。
-
-% ===== 8 实验与验证 =====
-\section{实验与验证}
-\label{sec:exp}
-
-\subsection{数据集与实验设置}
-\label{sec:dataset}
-\texttt{demo\_data/samples} 30 张中按“细--中--粗”连续级配精选 3 张入库（$3024\times4032$，$0.208$\,mm/px，21\,MB），覆盖 \texttt{GB/T 14685} 典型筛组 $5/10/16/20/25/31.5/40$\,mm 的质量主导区间（\cref{tab:dataset}）。成像统一深色托盘+漫射光+正俯定焦，\texttt{diameter=None} 自适应分割，无重训；推理产物已提交 \texttt{samples/results/} 75\,MB、48 文件/样本，\texttt{resolution} 由 \texttt{infer\_resolution} 中位数自动推断与标尺真值一致。
-\begin{table}[htbp]
-\centering\caption{数据集构成（3 张代表，$0.208$\,mm/px，$3024\times4032$）}
-\label{tab:dataset}
-\small
-\begin{tabular}{lcccccl}
-\toprule
-样本 & $n$ & $n_{\mathrm{normal}}$ & 主粒级（质量\%） & $D_{50}^{\mathrm{mass}}$ & $D_{50}^{\mathrm{num}}$ & 类型 \\
-\midrule
-\texttt{agg\_029} & 966 & 520 & $5$--$10$: $32.7$ & $14.6$ & $5.2$ & 细粒主导 \\
-\texttt{agg\_001} & 1924 & 1193 & $25$--$31.5$: $34.2$ & $23.6$ & $6.0$ & 中值/连续 \\
-\texttt{agg\_005} & 968 & 703 & $25$--$31.5$: $29.7$；$>40$: $5.0$ & $27.5$ & $7.6$ & 粗粒主导 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{主要结果}
-\begin{table}[htbp]
-\centering\caption{3 样本质量加权 $D$ 值与主粒级（剔除异常后）}\label{tab:main-results}
-\begin{tabular}{lcccccc}
-\toprule
-样本 & $n$ & $n_{\mathrm{normal}}$ & $D_{10}$ & $D_{50}$ & $D_{90}$ & 主粒级 \\
-\midrule
-agg\_001 & 1924 & 1193 & 11.1 & 23.6 & 30.6 & $25$--$31.5$ (34.2\%) \\
-agg\_005 & 968  & 703  & 15.6 & 27.5 & 38.0 & $25$--$31.5$ (29.7\%) \\
-agg\_029 & 966  & 520  & 6.7  & 14.6 & 30.6 & $5$--$10$ (32.7\%) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-数量 vs 质量差异见图\ref{fig:gsd}：质量 $D_{50}$ 比数量 $D_{50}$ 大 $2$--$3$ 倍，印证质量主导。
-
-\subsection{消融}
-\begin{table}[htbp]
-\centering\caption{$\gamma$ 消融（agg\_001，$\theta=(1,0,0)$）与 demo 异物案例}\label{tab:ablation}
-\begin{tabular}{lccccc}
-\toprule
-方法 & $\gamma$ & $D_{10}$ & $D_{50}$ & $D_{90}$ & 说明 \\
-\midrule
-数量 & --- & 3.1 & 6.0 & 17.3 & 未加权 \\
-质量 $\gamma=1$ & 1.0 & --- & 12.6 & --- & 线性加权 \\
-质量 $\gamma=2$ & 2.0 & --- & 23.7 & --- & 面积加权 \\
-质量 $\gamma=3$ & 3.0 & 10.6 & 23.5 & 30.6 & 体积加权（默认）\\
-含 67\,mm 异物 & 3.0 & --- & 67.1 & 67.1 & demo 被异物主导 \\
-剔除后 & 3.0 & 11.1 & 23.6 & 30.6 & 提交口径 \\
-\bottomrule
-\end{tabular}
-\end{table}
-$\gamma$ 增大时 $D$ 单调右移，符合 $w=d^{\gamma}$ 预期；异物案例显示剔除策略必要性。
-
-\subsection{消融扩展：$\theta$ 与剔除}
-\label{sec:ablation-theta}
-\cref{tab:ablation} 在 \texttt{agg\_001} 上执行 \texttt{report.ablation\_table} 四维消融：
-(i) $\gamma=1/2/3$ 时 $D_{50}$ 单调 $10.1\!\to\!18.0\!\to\!23.5$\,mm，符合体积律；(ii) $\theta=(0.8,0.2,0)$ vs $(1,0,0)$ 仅 $23.5\!\to\!23.6$\,mm ($<0.5\%$)，说明 $b$ 主导，$d_{\mathrm{eq}}$ 仅微调；纯 $d_{\mathrm{eq}}$ 则 $26.0$\,mm 偏大 $10\%$；(iii) 剔除 $<5$\,mm 后 $D_{10}\,10.6\!\to\!11.1$\,mm、$D_{50}\,23.50\!\to\!23.56$\,mm，质量权重下 $<5$\,mm 贡献 $<1\%$，剔除仅洁净口径。
-
-\subsection{不确定度与性能}
-\label{sec:uncertainty}
-上游 \texttt{gsd\_uncertainty.bootstrapping} 对数量口径做 $1000$ 次有放回重采样得 95\% Confidence Interval（CI）（文件 \texttt{*\_full\_uncertainty.csv}）。\texttt{agg\_001/005/029} 的 $D_{50}^{\mathrm{num}}=6.0\,[5.81,6.23]/7.60\,[7.24,8.33]/5.21\,[5.03,5.38]$\,mm，宽度随分位数升高而增宽。\cref{fig:timing} 给出单张时序：分割 $17$\,s、测量 $9$\,s、筛分 $<1$\,s，3 张批量 $\sim81$\,s $\ll30$\,min；CPU 慢约 $10$ 倍仍可在窗口内完成单张。
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[xscale=0.24,yscale=0.6]
-\draw[->] (0,0) -- (30,0) node[right]{\footnotesize s};
-\foreach \x in {0,5,10,15,20,25,30} \draw (\x,0.12)--(\x,-0.12) node[below]{\footnotesize \x};
-\fill[blue!30] (0,1) rectangle (17,1.8) node[midway]{\footnotesize 分割 $17$\,s};
-\fill[green!30] (17,1) rectangle (26,1.8) node[midway]{\footnotesize 测量 $9$\,s};
-\fill[orange!40] (26,1) rectangle (27,1.8) node[midway] {};
-% 标签外置，避免窄条重叠
-\node[above right, font=\scriptsize, align=left] at (27,1.8) {筛分 $<1$\,s};
-\draw[dashed] (27,0) -- (27,2.2);
-\node at (13,-0.9) {\footnotesize 单张 $\sim27$\,s；3 张 $\sim81$\,s $\ll30$\,min};
-\end{tikzpicture}
-\caption{单张时序分解（GPU，\texttt{imagegrains}$\to$\texttt{aggregate\_screening} 两步）。}
-\label{fig:timing}
-\end{figure}
-\FloatBarrier
-
-\subsection{测试覆盖与可复现}
-\label{sec:tests}
-\texttt{pytest tests/test\_sieve\_equivalent} 等 4 套件共 $\mathbf{27}$ \texttt{passed}（合成数据，无权重依赖）：\texttt{sieve\_equivalent} 10 项含 $d_{\mathrm{eq}}$、$w=d^{\gamma}$ 立方、阶梯逆与 \texttt{fit\_calibration} 合成恢复（$|\hat\gamma-\gamma|<0.3$）；\texttt{morphology} 6 项；\texttt{anomaly} 5 项；\texttt{report} 5 项含 \texttt{SceneSummary} 与 \texttt{ablation\_table}。环境见 \texttt{pyproject.toml:18}（\texttt{cellpose$\ge$4.0.1}、\texttt{numpy$\le$2.2}、\texttt{scipy}），\texttt{conda} 可 1 行重建。
-
-% ===== 9 设备与 SOP =====
-\section{设备选型与现场 30\,min SOP}
-
-\subsection{设备清单}
-\begin{table}[htbp]
-\centering\footnotesize\caption{推荐设备（可按预算替换，参数需在报告中量化）}\label{tab:equip}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{6.0cm}}
-\toprule
-类别 & 型号/参数 & 作用 \\
-\midrule
-相机 & $\ge 12$\,MP，全局快门，定焦 25\,mm & $3024\times4032$ 俯视，$0.15$--$0.25$\,mm/px \\
-镜头/标定 & 标尺/ArUco 4$\times$4，$30$\,mm 边长 & mm/px 标定与畸变校正 \\
-托盘/背景 & 深色哑光托盘 $60\times40$\,cm & 降阴影、提分割对比 \\
-光源 & 环形漫射 Light Emitting Diode（LED）5000\,K & 均匀照明，避免镜面反射 \\
-计算 & NVIDIA NVIDIA GeForce RTX 4080 SUPER / 等效，Compute Unified Device Architecture（CUDA） & $2$--$3$\,s/张分割 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{30\,min SOP}
-\begin{enumerate}[leftmargin=2em]
-\item 摆拍（5\,min）：单层撒料、放标尺/ArUco、深色背景；
-\item 拍照（1\,min）：正俯 1--3 张，固定高度与曝光；
-\item 分割（5\,min）：\texttt{python -m imagegrains --img\_dir $<$图$>$ --resolution 0.208 --gpu True}，目检 \texttt{*\_composite.png}；
-\item 筛分（1\,min）：\texttt{python -m aggregate\_screening --grains *\_re\_scaled.csv --out\_dir report}；
-\item 核对（2\,min）：读 \texttt{*\_report.txt} 剔除后 $D$ 值，导 \texttt{*\_gsd\_comparison.png} 与 \texttt{*\_axes\_overlay.png}。
-\end{enumerate}
-一次演示命令见 \texttt{docs/USAGE.md} 第10节，已含 \texttt{demo\_data/samples/demo} 可复现链路。
-
-% ===== 9 设备选型与现场 SOP 已在前面，保持 =====
-
-% ===== 10 局限、失败分析与展望 =====
-\section{局限、失败分析与展望}
-\label{sec:limit}
-
-\begin{tcolorbox}[colback=red!3,colframe=red!40,title=局限与边界（主动披露）, width=\linewidth, breakable, before upper={\raggedright}]
-\textbf{(1) 遮挡 $>30\%$ 失效：} 二层堆叠与阴影粘连超 $30\%$ 面积时，SAM 仍现过/漏分割，$b$ 低估致 $D_{50}$ 偏细，缓解靠单层撒料、漫射光及\texttt{--diameter}$\pm10$\,px 微调。\\
-\textbf{(2) $<3$\,mm 漏检：} $0.208$\,mm/px 下 $3$\,mm $\approx14$\,px，接近 \texttt{min\_size}$=15$\,px$^{2}$ 与光学极限，实测 $<3$\,mm 占比 $6$--$9\%$，需 $0.12$--$0.15$\,mm/px 方可完整覆盖 $2$--$5$\,mm。\\
-\textbf{(3) 厚度缺失：} 单目无厚度，$\theta_{3}$ 仅吸收系统偏差，$>50$\,mm 判据在扁平针片上可能误判。\\
-\textbf{(4) 泥团仅几何兜底：} $40$--$50$\,mm 且 $S<0.85$，无颜色/纹理，误报待 \texttt{crop} 分类器升级。\\
-\end{tcolorbox}
-
-\textbf{误差分解：} $\theta/\gamma$ 未校准为主导 $>$ 尺度 $\delta_{\mathrm{res}}/\mathrm{res}$ （$4.8\%$ 对应 $0.208\!\to\!0.218$）$>$ 分割。
-
-\textbf{路线图：} (1) $\ge5$ 批筛分真值校准 $\theta/\gamma$（\cref{alg:calib}）(2) ArUco 4$\times$4 $30$\,mm + 单应畸变校正 (3) 泥团 \texttt{crop} 图像分类器 + 形貌阈值重标定 (4) 一键 GUI（Streamlit）。
-
-% ===== 11 结论 =====
-\section{结论}
-\label{sec:conclusion}
-
-本报告以“质量加权校准”为核心，证明在自然堆积场景下：零样本 Cellpose-SAM 可解决粘连分离；显式 $d(\theta)/w(\gamma)$ 可将数量分布转为质量级配；规则形貌/异常在可标定前提下满足加分与必选。3 张实测覆盖细--粗，$17+9+<1$\,s/张满足现场 $\le30$\,min。下步聚焦校准闭环与泥团分类器。
-
-% ===== 参考文献 =====
-\bibliographystyle{gbt7714-numerical}
+% -------------------- 参考文献 --------------------
+\clearpage
+\addcontentsline{toc}{section}{参考文献}
+\bibliographystyle{gbt7714-numeric}
 \bibliography{refs}
 
-% ===== 附录 =====
+% -------------------- 附录 --------------------
 \clearpage
 \appendix
-\section{产出一览与复现}
-\label{app:repro}
-
-{\footnotesize 仓库 \texttt{demo\_data/samples/results/} 已包含 3 样本的完整推理产物（75\,MB，48 文件/样本），可直接复现与比对。\par}
-
-\begin{lstlisting}[language=bash,caption={一键复现（仓库根）}]
-conda activate imagegrains
-python -m imagegrains --img_dir demo_data/samples --model_dir models \
-  --out_dir demo_data/samples/demo --resolution 0.208 --gpu True
-python -m aggregate_screening \
-  --grains demo_data/samples/demo/agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled.csv \
-  --out_dir demo_data/samples/demo/report
-cat demo_data/samples/demo/report/*report.txt
-\end{lstlisting}
-
-{\footnotesize\noindent 11 件产物/样本：掩膜 \texttt{*\_pred.tif}、表格 \texttt{*\_grains.csv}/\texttt{*\_re\_scaled.csv}/\texttt{*\_gsd.csv}、报告 \texttt{*\_report.txt}/\texttt{*\_summary.json}、可视化 \texttt{*\_detection\_overview.png} 等（8 张）。详见 \texttt{docs/USAGE.md} 第10节。\par}
+\input{reviewer/08_appendix}
 
 \end{document}

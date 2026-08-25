@@ -7,7 +7,7 @@ description: Revise the Chinese technical report for the concrete aggregate inte
 
 ## 1. Purpose
 
-Use this skill whenever editing `docs/paper/main.tex` or files under `docs/paper/reviewer/`.
+Use this skill whenever editing `docs/paper/main.tex` or files under `docs/paper/sections/`.
 
 The target is a concise, credible Chinese technical report for competition judges. The report should read as the work of an engineering team that understands the problem, made explicit design choices, implemented a complete system, and knows exactly what its current evidence does and does not support.
 

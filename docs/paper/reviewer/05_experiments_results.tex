@@ -2,9 +2,31 @@
 \section{实验设计与阶段性结果}
 \label{sec:r-results}
 
-\subsection{证据协议与评价指标}
+\subsection{数据角色、证据协议与评价指标}
 
 本文将实验分为三类证据。\textbf{功能演示}回答处理链能否从真实自然堆积图像稳定地产生实例、毫米几何、级配、形貌和异常输出；\textbf{软件一致性}通过合成单元测试检查数学定义和代码实现是否一致；\textbf{物理精度验证}则必须使用独立 ground truth，才能声明实例精度、筛分精度或形貌/异常准确率。三者不能互相替代，特别是没有机械筛分称量真值时，视觉级配曲线只能视为模型输出而非“准确率”。
+
+表\ref{tab:r-evidence-roles}把当前已有数据与正式比赛仍需补充的数据分开。三张演示图用于确认完整数据链和展示场景差异；人工实例掩膜应覆盖普通区域与粘连/遮挡困难区域；机械筛分数据必须与成像使用同一物理批次；形貌与异常标签则用于附加任务。这样的拆分防止最常见的验证错误：用模型自己的另一个输出作为“真值”，或把同一物理批次的多张照片随机拆到训练和测试两侧。
+
+\begin{table}[t]
+\centering
+\caption{评委版实验中不同数据的角色与当前状态。}
+\label{tab:r-evidence-roles}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{2.0cm}}
+\toprule
+数据 & 用途 & 关键输出/指标 & 状态 \\
+\midrule
+3 张自然堆积 demo & 端到端功能、行为性分析、可视化 & 实例数、$D_p$、粒级、形貌/异常 & 已有 \\
+合成单元测试 & 数学定义与代码一致性 & 27 项测试是否通过 & 已有 \\
+人工实例 mask & 上游实例精度与 merge/split & P/R/F1、IoU、merge/split & 待补 \\
+配对机械筛分批次 & $\boldsymbol{\theta},\gamma$ 校准与独立筛分评价 & $D_p$ 误差、逐筛级误差、曲线误差 & 关键缺口 \\
+人工形貌/异常标签 & 附加能力外部有效性 & Macro-F1、P/R/F1 & 待补 \\
+完整现场演练 & 30~min 工程约束 & 端到端 wall-clock time、失败恢复 & 待实测 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 最终正式实验应围绕同一物理批次建立配对证据：相机分支产生视觉预测，机械筛分分支产生逐筛质量真值。校准批次用于拟合 $\boldsymbol{\theta},\gamma$；独立测试批次在参数冻结后计算
 \begin{equation}
@@ -13,9 +35,11 @@
  \mathrm{MAE}_{\mathrm{sieve}}=\frac{1}{K}\sum_{k=1}^{K}\left|\widehat P_k-P_k^{\mathrm{GT}}\right|.
 \label{eq:r-metrics}
 \end{equation}
-实例识别使用人工实例 mask 报告 Precision/Recall/F1、IoU 及 merge/split；二维形貌和异常分别使用人工标签报告 Macro-F1 或 Precision/Recall。工程性能按完整 SOP 的 wall-clock time 评价，而不是只统计神经网络前向时间。
+还应同时报告相对 $D_p$ 误差和累计通过率曲线，以避免单一指标掩盖局部筛级偏差。实例识别使用人工实例 mask 报告 Precision/Recall/F1、IoU 及 merge/split；二维形貌和异常分别使用人工标签报告 Macro-F1 或 Precision/Recall。工程性能按完整 SOP 的 wall-clock time 评价，而不是只统计神经网络前向时间。
 
-\subsection{真实图像功能演示}
+实验采样还需要覆盖真正可能改变误差结构的场景变量，而不是只增加相似照片数量。至少应包含偏细、连续和偏粗级配；低/中/高接触程度；不同位置与轻度光照变化；以及人为加入的超限块和泥团候选。若最终机械筛分批次数量有限，宁可保证物理批次之间的级配差异和严格独立测试，也不应通过同一批材料拍很多相似图片制造虚假的大样本量。
+
+\subsection{真实图像功能演示与场景差异}
 
 当前仓库包含 \texttt{agg\_001}、\texttt{agg\_005} 和 \texttt{agg\_029} 三张自然堆积演示图像，分辨率均为 3024$\times$4032，使用已写入产物的尺度 0.208~mm/px。三张图在当前基线 $\boldsymbol{\theta}=(1,0,0)$、$\gamma=3$ 下共检测 3858 个实例，并生成逐颗粒几何表、筛分等效粒径、质量代理级配、形貌/异常标签及可视化。表\ref{tab:r-demo-main}汇总正常实例口径下的当前输出。由于参数尚未用本赛题配对机械筛分批次校准，这些 $D_p$ 只能解释为\textbf{当前视觉质量代理预测}。
 
@@ -37,23 +61,30 @@
 \end{tabular}
 \end{table}
 
-三张场景得到明显不同的预测结构：\texttt{agg\_005} 粗粒尾部更强，\texttt{agg\_029} 则明显偏细，$D_{50}$ 排序为 \texttt{agg\_029}<\texttt{agg\_001}<\texttt{agg\_005}。这支持“同一处理链能将不同真实场景转换为非退化的场景级级配描述”，但不能说明哪条曲线最接近机械筛分。图\ref{fig:r-demo-pair}以 \texttt{agg\_001} 为例并列展示实例层与场景级分布层，使最终数字能够回溯到上游颗粒边界。
+三张场景得到明显不同的预测结构：\texttt{agg\_005} 粗粒尾部更强，\texttt{agg\_029} 则明显偏细，$D_{50}$ 排序为 \texttt{agg\_029}<\texttt{agg\_001}<\texttt{agg\_005}。这支持“同一处理链能将不同真实场景转换为非退化的场景级级配描述”，但不能说明哪条曲线最接近机械筛分。图\ref{fig:r-three-gsd}进一步把三个场景的数量/质量代理输出并列展示，可以看到差异不是由一个汇总数字产生，而是在完整分布形状上存在。
 
 \begin{figure}[t]
 \centering
-\begin{subfigure}{0.48\linewidth}
-\centering
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption{实例检测与粒径概览}
-\end{subfigure}\hfill
-\begin{subfigure}{0.48\linewidth}
+\begin{subfigure}{0.32\linewidth}
 \centering
 \includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
-\caption{数量与质量代理分布}
+\caption{\texttt{agg\_001}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_005_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{\texttt{agg\_005}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.32\linewidth}
+\centering
+\includegraphics[width=\linewidth]{agg_029_IG2_full_set_cp_SAM_pred_grains_re_scaled_gsd_comparison.png}
+\caption{\texttt{agg\_029}}
 \end{subfigure}
-\caption{\texttt{agg\_001} 的端到端功能演示。右图没有叠加机械筛分真值，因此只用于分析统计口径和系统行为。}
-\label{fig:r-demo-pair}
+\caption{三张演示样本的数量型与质量代理型粒径分布。图中没有机械筛分真值，因此用于比较场景行为和统计口径，不作为物理准确率曲线。}
+\label{fig:r-three-gsd}
 \end{figure}
+
+从逐筛质量代理比例也能看出场景结构差异。\texttt{agg\_001} 的 20--31.5~mm 合计约 55.3\%，\texttt{agg\_005} 的 25--40~mm 约 55.6\%，而 \texttt{agg\_029} 的 5--16~mm 约 51.9\%。这些比例来自同一计算规则，因此能够用于检查实现是否对不同输入给出一致口径；但它们只有在机械筛分配对后才可转化为“预测误差”。
 
 \subsection{数量统计与质量代理：核心行为性证据}
 
@@ -80,16 +111,140 @@
 
 该变化可由式\eqref{eq:r-mass}直接解释：自然堆积图中小实例数量很多，但其单颗粒质量贡献较低；少量粗颗粒虽然在个数中占比小，却在幂次权重下显著影响累计质量。以 \texttt{agg\_001} 为例，当前 $<5$~mm 实例占检测数量的 38.0\%，剔除这些实例后质量代理 $D_{50}$ 仅由 23.50~mm 变为 23.56~mm，说明“大量小实例”不必然意味着“大量质量”。相反，错误 merge 产生的少量粗目标会被 $d^{\gamma}$ 放大，因此独立实例边界对高分位质量级配尤为关键。
 
+\texttt{agg\_029} 提供了另一个有用现象：其正常实例仅占检测数的 53.8\%，过小候选数量最多，但正常口径下质量代理 $D_{90}$ 仍达到 30.6~mm。换言之，数量端“看起来很细”和质量端仍存在粗颗粒贡献可以同时成立。这正是机械筛分按质量计量与机器视觉按目标计数之间的统计差异，也是本文必须显式建立质量映射而非直接报告实例直方图的原因。
+
 需要区分两个结论：现有结果足以支持“不能忽略质量口径”；但 $\gamma$ 越大本来就会推动分布向粗粒移动，因此不能仅凭曲线看起来更合理就选定 $\gamma=3$。只有当某个 $\gamma$ 在独立机械筛分测试上降低式\eqref{eq:r-metrics}的误差时，才能把它称为更好的物理质量模型。
 
-\subsection{形貌、异常、软件一致性与运行时间}
+\subsection{投影形貌与异常候选}
 
-当前几何规则在三张图上均产生了非退化的投影形貌分布：普通类占 55.0\%--64.1\%，针片状候选约 14.0\%--20.9\%，圆形与棱角状比例随场景变化。该结果证明形貌分支能够运行，但在没有独立人工标签和厚度真值时不报告“针片状准确率”。异常分支中三张图均未触发 $>50$~mm 或疑似泥团规则，主要触发的是 $<5$~mm 小目标；因此这些演示图同样不能用于估计 oversized 或泥团召回率。
+当前几何规则在三张图上均产生了非退化的投影形貌分布，具体比例见表\ref{tab:r-shape-results}。普通类占 55.0\%--64.1\%，针片状候选约 14.0\%--20.9\%；\texttt{agg\_005} 的针片状候选比例最高，而 \texttt{agg\_029} 的圆形比例相对较高。这些差异说明 AR、圆度和凸度能够把场景中的二维轮廓组织成可检查统计，但没有人工/量规 ground truth 时不能进一步解释为材料真实针片状率。
 
-仓库为筛分等效粒径、质量权重、加权分位数、形貌规则、异常优先级和报告生成提供了 27 项合成单元测试，当前记录全部通过。这支持的是“代码实现与数学定义一致”，例如合成校准数据可以恢复接近设定的参数；它不能替代真实图像和机械筛分的外部有效性验证。历史运行记录约为实例分割 17~s、几何测量 9~s、筛分统计 $<1$~s，即算法阶段约 27~s/张，说明计算时间远小于 30~min 窗口；最终仍需用完整现场 SOP 重新计时。
+\begin{table}[t]
+\centering
+\caption{三张演示样本的投影形貌规则输出（占全部检测实例比例，\%）。}
+\label{tab:r-shape-results}
+\footnotesize
+\begin{tabular}{lrrrr}
+\toprule
+样本 & 针片状候选 & 圆形 & 棱角状 & 普通 \\
+\midrule
+\texttt{agg\_001} & 16.3 & 8.0 & 16.4 & 59.3 \\
+\texttt{agg\_005} & 20.9 & 6.6 & 17.6 & 55.0 \\
+\texttt{agg\_029} & 14.0 & 11.0 & 11.0 & 64.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{最终机械筛分验证与消融}
+图\ref{fig:r-shape-montage}以 \texttt{agg\_001} 为例展示四类高亮结果。图的价值在于检查规则是否定位到了与定义一致的轮廓类型，而不是用视觉印象代替准确率。例如，针片状候选应主要集中于低 AR 的细长投影；圆形应同时具有较高圆度和凸度。若高亮区域明显不符合这些定义，优先应检查实例 mask 和阈值实现，而不是直接解读最终比例。
 
-当前最关键的实验缺口是：三张演示样本没有配对提交逐筛机械称量数据。因此本版本不填写机械筛分准确率，也不把未校准 $D_p$ 作为竞赛精度结论。正式测试应至少建立若干配对批次，其中一部分用于拟合参数，另一部分完全隔离为测试集。独立测试中至少报告：三个 $D_p$ 的绝对/相对误差、逐筛级质量占比或累计通过率误差，以及各批次均值与离散程度。
+\begin{figure}[t]
+\centering
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_needle_flaky.png}
+\caption{针片状候选}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_round.png}
+\caption{圆形}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_angular.png}
+\caption{棱角状}
+\end{subfigure}\hfill
+\begin{subfigure}{0.24\linewidth}\centering
+\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_shape_regular.png}
+\caption{普通}
+\end{subfigure}
+\caption{\texttt{agg\_001} 的二维投影形貌高亮。类别由几何阈值产生，图像用于规则可解释性检查，不替代专家形貌 ground truth。}
+\label{fig:r-shape-montage}
+\end{figure}
 
-同时需要用同一测试集完成最小消融：比较 $d=b$、$d=d_{\mathrm{eq}}$ 与式\eqref{eq:r-sieve-d}；比较数量等权、固定 $\gamma$ 与校准 $\gamma$；比较校准前后；比较异常保留与剔除。真正有解释力的结论应表述为“某设计使机械筛分误差降低多少”，而不是“参数变化后曲线移动了多少”。在获得物理真值之前，本文保留这一证据边界，比给出未经验证的高准确率更能反映系统当前真实成熟度。
+异常分支的当前输出见表\ref{tab:r-anomaly-results}。三张图均未触发 $>50$~mm oversized 或疑似泥团规则，主要触发的是 $<5$~mm 小目标。该结果不能说明系统对 oversized 或泥团“零误报且完全正确”，更准确的结论是：\textbf{当前三张演示数据不包含足以检验这两个分支的阳性证据。} 正式测试应主动构造正常骨料、已知 $>50$~mm 大块和泥团/非骨料异物混合样本，分别计算 Precision/Recall，而不是等待随机场景恰好出现异常。
+
+\begin{table}[t]
+\centering
+\caption{演示样本的异常规则输出（实例数）。}
+\label{tab:r-anomaly-results}
+\footnotesize
+\begin{tabular}{lrrrr}
+\toprule
+样本 & 正常 & $>50$~mm & $<5$~mm & 疑似泥团 \\
+\midrule
+\texttt{agg\_001} & 1193 & 0 & 731 & 0 \\
+\texttt{agg\_005} & 703 & 0 & 265 & 0 \\
+\texttt{agg\_029} & 520 & 0 & 446 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{软件一致性与工程时序}
+
+仓库为筛分等效粒径、质量权重、加权分位数、形貌规则、异常优先级和报告生成提供了 27 项合成单元测试，当前记录全部通过。表\ref{tab:r-software-tests}说明这些测试能够证明和不能证明什么。特别是，合成数据可以构造已知 $\boldsymbol{\theta},\gamma$ 并检查优化器是否恢复接近设定值，这证明参数拟合路径在数学上可运行；它并不证明真实骨料确实服从该模型。
+
+\begin{table}[t]
+\centering
+\caption{竞赛层软件测试的证据范围。}
+\label{tab:r-software-tests}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+模块 & 测试关注点 & 不能替代的现实验证 \\
+\midrule
+筛分等效与校准 & 粒径公式、质量权重、分位数、合成参数恢复 & 真实二维粒径与机械筛孔的对应关系 \\
+形貌 & AR/$C$/$S$ 阈值与优先级逻辑 & 专家/量规形貌准确率 \\
+异常 & oversized/undersized/泥团候选规则边界 & 真实异常 Precision/Recall \\
+报告 & JSON/表格字段、正常口径与异常剔除一致性 & 现场输入质量和外部物理准确率 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+历史运行记录约为实例分割 17~s、几何测量 9~s、筛分统计 $<1$~s，即算法阶段约 27~s/张。计算本身因此不是 30~min 约束下的主要瓶颈；更可能占用现场时间的是设备就位、尺度确认、采集质检、模型首次加载、结果目检和一次失败恢复。基于这一判断，第\ref{sec:r-deploy}节把 30~min 预算分配给完整操作链，而不是将“27 秒”直接写成系统总耗时。
+
+\subsection{最终机械筛分验证与最小消融矩阵}
+
+当前最关键的实验缺口是：三张演示样本没有配对提交逐筛机械称量数据。因此本版本不填写机械筛分准确率，也不把未校准 $D_p$ 作为竞赛精度结论。正式测试应至少建立若干配对批次，其中一部分用于拟合参数，另一部分完全隔离为测试集。独立测试中至少报告：三个 $D_p$ 的绝对/相对误差、逐筛级质量占比或累计通过率误差，以及各批次均值与离散程度。表\ref{tab:r-physical-template}给出最终报告应替换的结果位置；当前保持“待测”比填入视觉自比较数字更符合证据逻辑。
+
+\begin{table}[t]
+\centering
+\caption{独立机械筛分测试的最终结果模板。获得同批逐筛称量后直接回填。}
+\label{tab:r-physical-template}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lrrrrr}
+\toprule
+测试批次 & $|\Delta D_{10}|$ & $|\Delta D_{50}|$ & $|\Delta D_{90}|$ & 筛级 MAE & 曲线/累计误差 \\
+ & \multicolumn{3}{c}{/ mm} & / percentage point & \\
+\midrule
+Test-1 & 待测 & 待测 & 待测 & 待测 & 待测 \\
+Test-2 & 待测 & 待测 & 待测 & 待测 & 待测 \\
+Test-3 & 待测 & 待测 & 待测 & 待测 & 待测 \\
+\midrule
+平均 & 待测 & 待测 & 待测 & 待测 & 待测 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+同时需要用同一独立测试集完成表\ref{tab:r-ablation-matrix}的最小消融。实验顺序应回答四个因果问题：短轴是否比面积等效直径更接近筛分；二者组合是否进一步降低误差；质量加权是否比数量等权更接近称重结果；机械筛分校准是否能在未见批次上继续降低误差。异常剔除则用于检查极端误检是否通过 $d^\gamma$ 放大并污染最终级配。
+
+\begin{table}[t]
+\centering
+\caption{正式物理验证的最小消融矩阵。所有行必须在同一独立测试批次上比较。}
+\label{tab:r-ablation-matrix}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\centering\arraybackslash}p{0.8cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+编号 & 设置 & 回答的问题 & 主要比较指标 \\
+\midrule
+A & $d=b$，数量等权 & 最简视觉粒径/计数基线有多大语义差距？ & $D_p$、筛级 MAE \\
+B & $d=b$，固定 $\gamma=3$ & 仅引入质量口径是否改善？ & B vs. A \\
+C & $d=d_{\mathrm{eq}}$，同一 $\gamma$ & 面积尺度还是短轴更接近筛孔？ & C vs. B \\
+D & 式\eqref{eq:r-sieve-d}，固定 $\gamma$ & 低维几何融合是否有效？ & D vs. B/C \\
+E & 式\eqref{eq:r-sieve-d}，校准 $\gamma$ & 质量指数校准是否具有独立收益？ & E vs. D \\
+F & E + 异常/质量控制 & 极端实例过滤能否降低粗端误差？ & F vs. E；失败案例 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+真正有解释力的结论应表述为“某设计使机械筛分独立测试误差降低多少”，而不是“参数变化后曲线移动了多少”。若 E 相比 D 没有稳定收益，则应保留更简单的固定质量模型；若 D 相比 $b$ 基线没有改善，则不应为了方法复杂度保留额外参数。换言之，最终系统结构也应由物理验证裁剪，而不是默认所有提出的模块都必须保留。在获得这些 ground truth 之前，本文明确保留证据边界，比给出未经验证的高准确率更能反映系统当前真实成熟度。

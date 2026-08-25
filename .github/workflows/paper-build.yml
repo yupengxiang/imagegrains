@@ -1,0 +1,49 @@
+name: Paper Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/paper/**'
+      - '.github/workflows/paper-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/paper/**'
+  workflow_dispatch:
+
+jobs:
+  build-paper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile technical report
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: main.tex
+          working_directory: docs/paper
+          latexmk_use_xelatex: true
+          args: -interaction=nonstopmode -file-line-error
+
+      - name: Check LaTeX warnings
+        working-directory: docs/paper
+        run: |
+          echo '== Undefined references / citations =='
+          if grep -Ei 'undefined references|citation.*undefined|reference.*undefined' main.log; then
+            echo 'LaTeX has unresolved references or citations.'
+            exit 1
+          fi
+          echo '== Overfull boxes =='
+          grep -E 'Overfull \\hbox|Overfull \\vbox' main.log || true
+
+      - name: Upload compiled PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: technical-report-pdf
+          path: docs/paper/main.pdf
+          if-no-files-found: error

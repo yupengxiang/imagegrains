@@ -1,0 +1,110 @@
+% !TeX root = ../main.tex
+% ===== 6 工程部署与局限性 =====
+\section{工程部署、质量控制与方法边界}
+\label{sec:r-deploy}
+
+\subsection{现场系统与硬件条件}
+
+现场部署围绕四个要求展开：几何量可追溯、实例结果可质检、运行参数固定、场景结果可复算。固定俯视相机需要为 5--40~mm 主粒级提供足够像素覆盖；低畸变镜头和刚性支架用于保持一次测试内的成像几何；深色哑光承载面与漫射照明减少硬阴影、高光和背景纹理对实例边界的干扰；与测量面尽量共面的标尺或平面标记提供尺度锚点；CUDA GPU 用于缩短 Cellpose-SAM 推理时间。
+
+\begin{table}[H]
+\centering
+\caption{推荐硬件条件及其与算法误差的关系。}
+\label{tab:r-hardware}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{6.5cm}}
+\toprule
+模块 & 推荐条件 & 现场作用 \\
+\midrule
+相机 & 约 12~MP 或更高；固定曝光 & 保证小颗粒仍有足够像素覆盖，并减少曝光漂移 \\
+镜头/支架 & 固定焦距、低畸变、刚性俯视安装 & 保持 mm/px 稳定；高度或焦距变化后重新标定 \\
+承载面 & 深色、哑光、尽量平整 & 提高边界对比并减小参考面与测量面高度差 \\
+照明 & 大面积漫射、亮度稳定 & 减少接触颗粒间的硬阴影连接和高光碎裂 \\
+尺度参考 & 已知尺寸标尺/平面标记，尽量共面 & 建立 pixel$\rightarrow$mm 的物理锚点 \\
+计算设备 & 支持 CUDA 的 NVIDIA GPU & 缩短推理时间，为质检和一次复跑留出余量 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+软件链分为上下游两个阶段。上游 \texttt{imagegrains} 完成实例分割、几何测量和毫米尺度写入；下游竞赛模块 \texttt{aggregate\_screening} 完成筛分等效粒径、质量代理级配、投影形貌、异常候选和场景级报告。两阶段解耦后，上游实例通过质检即可保存为逐颗粒 CSV，下游统计可以直接重算，无需重复执行神经网络推理。正式运行固定模型版本、$\boldsymbol{\theta}$、$\gamma$ 和规则阈值；相机几何改变时重新测量尺度 $r$。
+
+\subsection{30 min 操作流程}
+
+表\ref{tab:r-sop}给出面向赛题 30~min 约束的现场时间预算。约 27~s/张的历史算法时序只覆盖计算阶段，完整操作还需要设备就位、尺度确认、图像质检、模型加载、结果复核和一次失败恢复。时间预算因此把较大余量留给这些会直接影响测量可信度的环节。
+
+\begin{table}[H]
+\centering
+\caption{面向 30~min 约束的现场操作流程。}
+\label{tab:r-sop}
+\footnotesize
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\centering\arraybackslash}p{0.9cm}>{\raggedright\arraybackslash}p{3.1cm}>{\centering\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{7.4cm}}
+\toprule
+步骤 & 操作 & 预算 & 完成判据 \\
+\midrule
+1 & 设备就位、视场与照明 & 4~min & 目标完整入镜、相机固定、无明显模糊/硬阴影 \\
+2 & 尺度标定 & 3~min & 获得可信 mm/px，多位置参考无明显冲突 \\
+3 & 采集与快速质检 & 3~min & 图像清晰，参考物可读取且尽量共面 \\
+4 & 分割与几何测量 & 5~min & 生成实例 mask/CSV，无大面积 merge 或数量级异常 \\
+5 & 级配、形貌与异常分析 & 2~min & 生成 summary、级配曲线和可视化 \\
+6 & 结果复核与必要复跑 & 5~min & 尺度、实例、轴长和级配量级一致 \\
+7 & 导出与留档 & 3~min & 原图、参数、逐颗粒表和场景报告完整关联 \\
+-- & 故障余量 & 5~min & 用于模型首次加载、一次重拍或流程恢复 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{分层质量控制与失败恢复}
+
+质检按采集、实例和物理统计三层进行。采集层在推理前检查视场、曝光、清晰度、参考物和严重遮挡；输入条件不足时直接重拍。实例层在推理后检查 composite/overlay，重点寻找大面积 merge、异常碎裂、边缘截断和明显漏检；问题来自采集时返回上一层处理。物理与报告层检查尺度反算、轴长量级、筛级总和和输出文件完整性，防止旧批次 CSV、错误 resolution 或路径混用进入最终结果。最终 $D_{50}$ 是否符合经验预期不参与临场调参判断。
+
+\begin{table}[H]
+\centering
+\caption{典型失败信号及恢复动作。}
+\label{tab:r-recovery}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+失败信号 & 优先检查 & 恢复原则 \\
+\midrule
+尺度读数冲突 & 共面性、相机倾斜、镜头畸变、旧 resolution & 重新采集/标定，不改筛分参数掩盖尺度错误 \\
+大面积 merge & 硬阴影、严重接触、曝光或域失配 & 优先改善采集；仅允许使用赛前冻结的备用配置 \\
+大量细碎 split & 高光、纹理、分辨率、最小实例规则 & 检查图像后按固定规则复跑，不临场搜索阈值 \\
+$D_p$ 突然偏粗 & merge、极端异常、质量权重输入错误 & 向上追溯实例和逐颗粒表，不因结果预期修改 $\gamma$ \\
+输出文件不一致 & 批次 id、路径、流程中断 & 从最近通过质检的中间产物重算并核对关联关系 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+当大部分颗粒严重遮挡、参考物无法建立可信尺度，或实例结果出现固定流程无法恢复的大面积错误时，场景不进入主级配统计。这个门槛把“算法能够输出数字”和“输入条件足以支持测量”分开，避免在证据不足的场景上继续叠加后处理。
+
+\subsection{结果包与可追溯性}
+
+每个场景通过唯一 scene id 关联原始图像与尺度信息、integer mask 与实例可视化、逐颗粒几何和筛分字段、场景级级配报告以及模型与规则配置。逐颗粒表保存 $a,b,A,P,d_{\mathrm{eq}},d,w$ 和形貌/异常标签，因此任一 $D_p$、筛级占比或异常数量都能回溯到具体实例、尺度和参数；实例结果已经通过质检时，下游级配也能直接从结构化数据重算。附录进一步列出当前复现参数和最小结果包内容。
+
+\subsection{方法边界}
+
+当前方法的主要限制来自观测维度、统计假设和现有证据。没有配对机械筛分称量数据时，视觉质量代理级配只能按当前二维几何与权重模型解释。单目图像无法观测完全被遮挡的颗粒，也缺少厚度信息，因此二维短轴、面积和投影形貌会保留与真实三维筛孔行为之间的不可辨识残差。$w=d^3$ 依赖几何相似和近似稳定密度，对厚度、密度和形貌变化只作平均化描述。泥团候选主要由几何规则触发，现有输出缺少颜色、纹理或材料语义证据。
+
+\begin{table}[H]
+\centering
+\caption{当前方法的主要边界及其对结果解释的影响。}
+\label{tab:r-limits}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{5.3cm}}
+\toprule
+边界 & 主要影响 & 本文采用的处理方式 \\
+\midrule
+无机械筛分真值 & 无法报告标准筛分绝对误差 & 级配结果按视觉质量代理解释 \\
+遮挡与不可见颗粒 & 可见样本代表性下降 & 通过采集质检识别严重场景，不做无证据恢复 \\
+二维缺少厚度 & 筛孔行为和三维针片状存在不可辨识残差 & 使用显式低维几何代理，结论限定在二维投影层 \\
+质量幂律近似 & 大小/形貌变化可能使真实质量偏离 $d^3$ & 将 $d^3$ 作为统计代理，不作为逐颗粒称量值 \\
+泥团几何启发式 & 可能漏检或误报材质异常 & 只输出疑似候选，不作为材料鉴定 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+在这些边界内，系统形成了从现场采集、实例分割、毫米测量到级配统计和结果留档的完整运行路径。上游预训练模型减少现场训练工作，下游显式模型则使尺度、粒径和质量代理的作用能够分别检查。

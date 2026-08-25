@@ -45,6 +45,8 @@
 \begin{document}
 
 % -------------------- 封面 --------------------
+% 封面不建立 PDF page anchor，避免前置 Roman 页码与正文 Arabic 页码重置时产生重复锚点。
+\hypersetup{pageanchor=false}
 \begin{titlepage}
 \thispagestyle{empty}
 \centering
@@ -55,13 +57,14 @@
 \vspace{0.8cm}
 {\zihao{2} 自然堆积赛道\par}
 \vspace{0.5cm}
-{\zihao{3}\bfseries 基于实例感知与质量级配映射的视觉筛分方法\par}
+{\zihao{3}\bfseries 基于实例感知与可解释级配映射的视觉筛分方法\par}
 \vfill
 {\zihao{4} 匿名提交\par}
 \vspace{1.2cm}
 \end{titlepage}
 
 % -------------------- 前置部分 --------------------
+\hypersetup{pageanchor=true}
 \pagenumbering{Roman}
 \input{reviewer/00_abstract}
 \clearpage

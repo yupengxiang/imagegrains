@@ -22,18 +22,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile reviewer edition
+      - name: Compile technical report
         uses: xu-cheng/latex-action@v3
         with:
-          root_file: main_submission.tex
-          working_directory: docs/paper
-          latexmk_use_xelatex: true
-          args: -interaction=nonstopmode -file-line-error
-
-      - name: Compile full technical report
-        uses: xu-cheng/latex-action@v3
-        with:
-          root_file: main_v2.tex
+          root_file: main.tex
           working_directory: docs/paper
           latexmk_use_xelatex: true
           args: -interaction=nonstopmode -file-line-error
@@ -41,28 +33,19 @@ jobs:
       - name: Check LaTeX warnings
         working-directory: docs/paper
         run: |
-          for stem in main_submission main_v2; do
-            echo "== ${stem}: undefined references / citations =="
-            if grep -Ei 'undefined references|citation.*undefined|reference.*undefined' "${stem}.log"; then
-              echo "${stem} has unresolved references or citations."
-              exit 1
-            fi
-            echo "== ${stem}: overfull boxes =="
-            grep -E 'Overfull \\hbox|Overfull \\vbox' "${stem}.log" || true
-            echo "== ${stem}: page count =="
-            grep -E 'Output written on .*\([0-9]+ pages' "${stem}.log" | tail -1 || true
-          done
+          echo "== main: undefined references / citations =="
+          if grep -Ei 'undefined references|citation.*undefined|reference.*undefined' main.log; then
+            echo "main has unresolved references or citations."
+            exit 1
+          fi
+          echo "== main: overfull boxes =="
+          grep -E 'Overfull \\hbox|Overfull \\vbox' main.log || true
+          echo "== main: page count =="
+          grep -E 'Output written on .*\([0-9]+ pages' main.log | tail -1 || true
 
-      - name: Upload reviewer edition PDF
+      - name: Upload technical report PDF
         uses: actions/upload-artifact@v4
         with:
-          name: technical-report-reviewer-pdf
-          path: docs/paper/main_submission.pdf
-          if-no-files-found: error
-
-      - name: Upload full report PDF
-        uses: actions/upload-artifact@v4
-        with:
-          name: technical-report-v2-pdf
-          path: docs/paper/main_v2.pdf
+          name: technical-report-pdf
+          path: docs/paper/main.pdf
           if-no-files-found: error

@@ -112,7 +112,7 @@ $\gamma$ & 场景质量权重 & 粗颗粒质量份额增大，$D_p$ 常向粗端
 \begin{tikzpicture}[
   node distance=0.6cm and 0.65cm,
   b/.style={rectangle,draw,rounded corners,minimum width=3.1cm,minimum height=0.85cm,align=center,font=\footnotesize},
-  arr/.style={->,thick}, dash/.style={->,thick,dashed}
+  arr/.style={->,thick}, fb/.style={->,thick,dashed}
 ]
 \node[b,fill=gray!8] (batch) {同一物理骨料批次};
 \node[b,fill=blue!7,below left=0.65cm and 1.0cm of batch] (camera) {相机采集\\视觉逐颗粒预测};
@@ -122,7 +122,7 @@ $\gamma$ & 场景质量权重 & 粗颗粒质量份额增大，$D_p$ 常向粗端
 \node[b,fill=purple!7,below=0.8cm of fit,xshift=2.05cm] (freeze) {冻结参数\\正式测试/现场推理};
 \draw[arr] (batch)--(camera); \draw[arr] (batch)--(sieve);
 \draw[arr] (camera)--(fit); \draw[arr] (sieve)--(test);
-\draw[dash] (sieve.west) -| (fit.east);
+\draw[fb] (sieve.west) -| (fit.east);
 \draw[arr] (fit)--(freeze); \draw[arr] (freeze)--(test);
 \end{tikzpicture}
 \caption{机械筛分校准与独立测试协议。虚线表示校准批次的机械筛分真值参与参数拟合；独立测试批次不得反向参与参数选择。}

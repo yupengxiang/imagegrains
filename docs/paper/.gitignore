@@ -14,7 +14,7 @@
 *.vrb
 
 # 编译产物由 GitHub Actions artifact 提供，不提交仓库
-*.pdf
+# *.pdf
 
 # 编辑器
 *.swp

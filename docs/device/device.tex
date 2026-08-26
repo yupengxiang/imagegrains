@@ -1,0 +1,271 @@
+% !TeX program = xelatex
+% 采用的设备型号、参数、指标 — 自然堆积赛道
+% 编译: latexmk -xelatex device.tex
+
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+
+\usepackage[a4paper,top=2.2cm,bottom=2.2cm,left=2.15cm,right=2.15cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{float}
+\usepackage{hyperref}
+
+\captionsetup{font=small,labelfont=bf,width=0.94\linewidth,justification=raggedright,singlelinecheck=false}
+\setlist{nosep,leftmargin=1.8em}
+\setlength{\emergencystretch}{8em}
+\sloppy
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black,
+  pdftitle={采用的设备型号、参数、指标 — 自然堆积赛道},
+  pdfauthor={匿名},
+  breaklinks=true
+}
+
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+\begin{document}
+
+% -------------------- 封面 --------------------
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{2.5cm}
+{\zihao{2}\bfseries 混凝土骨料颗粒智能筛分\par}
+\vspace{0.9cm}
+{\zihao{-0}\bfseries 采用的设备型号、参数、指标\par}
+\vspace{0.7cm}
+{\zihao{3} 自然堆积赛道\par}
+\vspace{0.6cm}
+{\zihao{4} 独立说明文档\par}
+\vfill
+{\zihao{4} 匿名提交\par}
+{\zihao{5} 2026年8月\par}
+\vspace{1.2cm}
+\end{titlepage}
+
+% -------------------- 正文 --------------------
+\section{赛道与任务}
+
+\begin{itemize}
+  \item \textbf{赛道}：自然堆积。破碎骨料 $5$--$40$~mm，仓库或托盘上单层/准单层撒料，正俯拍静态图像，不含传送带跟踪。
+  \item \textbf{任务}：精细识别（颗粒与背景、颗粒间粘连分离）、粒径分析（长短径与 $D_{10}/D_{50}/D_{90}$）、形状分类（针片/圆/棱角/普通，可选）、异常检测（$>50$~mm 异物或泥团）。
+  \item \textbf{约束}：现场图像采集与设备调试 $\le 30$~分钟；非接触光学测量；以标准机械筛分的质量分布为评分参照。
+  \item \textbf{口径}：本方案输出质量代理级配（见第7节），对标筛分质量语义，同时保留数量分布作对照。
+\end{itemize}
+
+\section{设备总览}
+
+\begin{table}[H]
+\centering
+\caption{设备清单总览}
+\label{tab:overview}
+\small
+\begin{tabular}{p{1.5cm}p{2.1cm}p{4.2cm}p{4.0cm}p{2.8cm}}
+\toprule
+类别 & 设备 & 型号/规格 & 关键参数 & 用途 \\
+\midrule
+成像 & 智能手机 & 1200万像素，$3024\times4032$，$4{:}3$，JPG 8-bit sRGB & 视场 $\sim630\times840$~mm，分辨率 $0.208$~mm/px（见第3节） & 俯拍堆积照，1--3张/场景 \\
+成像备选 & 工业相机 & 海康 MV-{\small CA060-10GC}，600万像素，$1/1.8''$ CMOS，全局快门 + $8$~mm 定焦镜头 & 工作距 $600$--$800$~mm 时视场 $\sim550\times460$~mm，$0.20$--$0.25$~mm/px 等效 & 现场可替换，接口一致 \\
+固定 & 三脚架 & 手机夹 + 云台，可调高度 $700$--$900$~mm & 光轴垂直托盘，俯角 $<2^{\circ}$ & 保证正俯与尺度稳定 \\
+标尺 & 钢尺 & $500$~mm 刻度，全长 $535$~mm（含两端空白与圆孔） & 刻度精度 $1$~mm & 毫米标定 \\
+标定备选 & ArUco标志 & $4$枚，边长 $40$~mm，字典 DICT\_4X4\_50，贴于托盘四角 & 用于透视校正与尺度（备选） & 无钢尺时自动标定 \\
+载物台 & 托盘 & $400\times600$~mm 亚光深色（PVC/橡胶），挡边 $15$~mm & 哑光黑/深灰，漫反射 & 提升颗粒--背景对比，抑制反光 \\
+照明 & 面光源 & LED 漫射 $20$~W $\times2$，色温 $5000$~K，显指 Ra$>90$ & 照度 $\sim1500$~lx，$45^{\circ}$斜射或顶部柔光箱 & 均匀照明，避免硬阴影与高光 \\
+计算 & 工作站 & NVIDIA RTX 4080 SUPER $16$~GB + CUDA $11.8$ + PyTorch $2.2$，Intel i7-12700，$32$~GB 内存，NVMe $1$~TB & 分割 $17$~s + 测量 $9$~s + 下游 $<1$~s $\approx27$~s/张 & 本地一键推理 \\
+计算兜底 & 笔记本 & Intel i7 同级，CPU 推理 & 单张 $120$--$180$~s & 无GPU时应急 \\
+软件 & 程序 & ImageGrains $2.0$ + Cellpose-SAM $4.0.1$，权重 \code{IG2_full_set_cp_SAM} $1.2$~GB & 一键 \code{python -m imagegrains} + \code{python -m aggregate_screening} & 分割、测量、筛分映射与报告 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+演示三张样图（\code{agg_001/005/029}）用``手机+三脚架+钢尺+托盘+工作站''组合完成，工业相机为现场等效替换方案。
+
+\section{成像系统}
+
+\subsection{演示配置（已验证）}
+
+\begin{itemize}
+  \item 传感器 $1/2.55''$ $1200$万像素，$3024\times4032$，$4{:}3$，JPG，无EXIF依赖（自动校正方向）。
+  \item 工作距离约 $750$~mm 时，视场约 $630$~mm（宽）$\times838$~mm（高），分辨率 $0.208$~mm/px。推导：$3024\times0.208=629$~mm，$4032\times0.208=838$~mm。
+  \item 单颗粒像素尺度：$5$~mm $\approx24$~px，$10$~mm $\approx48$~px，$20$~mm $\approx96$~px，$40$~mm $\approx192$~px。
+  \item 固定：手机装于三脚架，镜头垂直托盘，关闭闪光，自动曝光，连拍 $1$--$3$~张。
+\end{itemize}
+
+\subsection{工业备选}
+
+海康 $600$万像素面阵相机，$8$~mm 定焦，工作距 $600$--$800$~mm，视场与分辨率与演示配置等效（$0.20$--$0.25$~mm/px 均可，通过标定统一）。
+
+\subsection{文件}
+
+支持 \code{jpg/png/tif}，批量读取图像目录；可选同名 \code{*_mask.tif} 供跳过分割直接测量。
+
+\section{标尺与几何标定}
+
+\subsection{钢尺法（主用）}
+
+\begin{itemize}
+  \item 钢尺平放于托盘同平面、紧贴视场边沿拍一张。
+  \item 检测白尺外框全长 $L_{\mathrm{full}}$（像素），则 $\mathrm{mm/px}=535/L_{\mathrm{full}}$。等价刻度长 $L_{\text{刻度}}=L_{\mathrm{full}}\times500/535$。
+  \item 与人眼 $48$~px/cm 误差约 $2$--$3\%$，满足 $D_{50}$ $5\%$ 要求。实现为白底/黑底高对比阈值与连通域筛选，无需OpenCV。
+  \item 标定一次后固定 \code{--resolution} 批量处理；更换工作距离需重标。
+\end{itemize}
+
+\subsection{ArUco法（备选）}
+
+托盘四角贴 $4$枚 $40$~mm ArUco，检测角点求单应性校正透视，同时得尺度。适合无钢尺或需自动化的场景。
+
+\subsection{手动}
+
+已知视场物理尺寸时直接传 \code{--resolution 0.208}，程序同时写入 \code{px/mm} 双列供反推校验。
+
+\section{载物与环境}
+
+\begin{itemize}
+  \item \textbf{托盘}：$400\times600$~mm 亚光深色，单层撒料避免多层遮挡；深色底与浅色骨料高对比利于分离粘连。
+  \item \textbf{照明}：漫射为主。硬阴影会导致大面积 \code{merge}（偏粗），高光会导致细碎 \code{split}（偏细）。采用柔光箱或白色天幕漫射，$45^{\circ}$斜射或顶部均匀照射。
+  \item \textbf{背景}：纯净无纹理；托盘外可铺黑绒布延伸背景，避免杂物入镜。
+  \item \textbf{撒料}：单层、均匀、不堆尖；大块与细料混布以保证代表性。
+\end{itemize}
+
+\section{计算平台}
+
+\begin{table}[H]
+\centering
+\caption{计算平台与时序}
+\small
+\begin{tabular}{p{1.6cm}p{7.2cm}p{4.8cm}}
+\toprule
+项目 & 配置 & 实测指标 \\
+\midrule
+GPU & NVIDIA RTX 4080 SUPER $16$~GB & 单张 $3024\times4032$ 分割约 $17$~s \\
+CPU & Intel i7-12700（兜底） & 单张 $120$--$180$~s（不推荐） \\
+内存 & $32$~GB & 批量$3$张峰值 $<12$~GB \\
+存储 & NVMe $1$~TB & 模型 $1.2$~GB + 结果约 $75$~MB/$3$张 \\
+系统 & Ubuntu $22.04$ / Windows $11$, Python $3.10$, PyTorch CUDA $11.8/12.1$ & \code{pytest} 27 passed \\
+时序 & 分割 $17$~s + 几何 $9$~s + 下游 $<1$~s $\approx27$~s/张 & 三张共 $<90$~s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+现场无GPU时可用CPU应急，但$30$分钟窗口建议保证GPU。
+
+\section{指标}
+
+\subsection{分辨率与视场}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+指标 & 数值 \\
+\midrule
+分辨率 & $0.208$~mm/px（三样本统一） \\
+视场 & 约 $630\times840$~mm \\
+$5$--$40$~mm 对应像素 & $24$--$192$~px \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{三样本实测（已提交结果）}
+
+\begin{table}[H]
+\centering
+\caption{三样本质量代理级配（剔除异常后）}
+\small
+\begin{tabular}{lcccc}
+\toprule
+场景 & 颗粒数 & 正常骨料 & $D_{10}/D_{50}/D_{90}$ & 主粒级（质量占比） \\
+\midrule
+\code{agg\_005} 粗 & $968$ & $703$ & $15.6/27.5/38.0$~mm & $25$--$31.5$~mm $29.7\%$，$31.5$--$40$~mm $25.9\%$ \\
+\code{agg\_001} 中 & $1924$ & $1193$ & $11.1/23.6/30.6$~mm & $25$--$31.5$~mm $34.2\%$ \\
+\code{agg\_029} 细 & $966$ & $520$ & $6.7/14.6/30.6$~mm & $5$--$10$~mm $32.7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+合计 $3858$颗，固定参数下三组级配可区分。
+
+\subsection{粒级与分位数}
+
+\begin{itemize}
+  \item 筛孔：$5,10,16,20,25,31.5,40$~mm，含边界桶 $<5$ 与 $>40$，输出质量占比$\%$，可折累计通过率。
+  \item 分位数：$D_{10}/D_{50}/D_{90}$ 为质量加权阶梯逆（$F(d)=\sum w\cdot\mathbf{1}(d_i\le d)/\sum w$，$w=d^3$）。
+\end{itemize}
+
+\subsection{形貌与异常}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+类别 & 占比/数量 \\
+\midrule
+针片状候选 & $14.0$--$20.9\%$ \\
+圆形 & $6.6$--$11.0\%$ \\
+棱角状 & $11.0$--$17.6\%$ \\
+普通 & $55.0$--$64.1\%$ \\
+大块异物 $>50$~mm & $0$~颗 \\
+过小噪声 $<5$~mm & $27.4$--$46.2\%$ \\
+疑似泥团 $40$--$50$~mm \& solidity$<0.85$ & $0$~颗（几何兜底） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+形貌为二维投影规则，非三维量规等价；泥团为候选筛查。
+
+\subsection{精度说明}
+
+本提交无配对机械筛分真值与人工掩膜，不报告``标准筛分绝对准确率''。合成测试与三样本可区分性说明流程自洽；$\gamma=3$为体积先验，形状随尺寸变化时可校准。
+
+\section{现场流程}
+
+\begin{table}[H]
+\centering
+\caption{现场 $30$~min SOP}
+\small
+\begin{tabular}{c p{2.8cm} p{6.5cm} c}
+\toprule
+步骤 & 操作 & 设备动作 & 预算 \\
+\midrule
+1 & 就位与布光 & 托盘摆正、漫射灯就位、手机上架调平 & $4$~min \\
+2 & 尺度标定 & 钢尺入视场同平面拍$1$张，求 \code{mm/px} 并固定 \code{--resolution} & $3$~min \\
+3 & 采集与质检 & 单层撒料，俯拍$1$--$3$张，目检曝光/清晰度/截断 & $3$~min \\
+4 & 分割与测量 & \code{python -m imagegrains --resolution 0.208 --gpu True}，看 \code{*_composite.png} & $5$~min \\
+5 & 级配/形貌/异常 & \code{python -m aggregate_screening --grains *_re_scaled.csv} & $2$~min \\
+6 & 复核与复跑 & 核对 \code{*_report.txt} 剔除后 $D_{50}$ 与 \code{*_gsd_comparison.png}，必要重拍 & $5$~min \\
+7 & 导出留档 & 导出 \code{*.json}/\code{*.csv}/PNG 报告 & $3$~min \\
+--- & 余量 & 故障/重拍 & $5$~min \\
+\midrule
+\multicolumn{3}{l}{\textbf{合计}} & \textbf{$30$~min} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+一键命令：
+\begin{verbatim}
+python -m imagegrains --img_dir <img_dir> --model_dir models \
+  --out_dir <out_dir> --resolution 0.208 --gpu True
+python -m aggregate_screening --grains <out_dir>/*_re_scaled.csv \
+  --out_dir <out_dir>/report
+\end{verbatim}
+
+\section{维护与校验}
+
+\begin{itemize}
+  \item \textbf{日常}：镜头清洁、托盘去粉尘、尺面无反光膜；工作距离固定后贴标记。
+  \item \textbf{校验}：每场首张含尺图必存；用 \code{b_mm/b_px} 中位数反推校验 \code{mm/px}；$D_{50}$突变时追溯 \code{*_particles_annotated.csv} 与 \code{*_axes_overlay.png}。
+  \item \textbf{备件}：备用钢尺、备用手机/相机、充电宝与电源线。
+\end{itemize}
+
+\end{document}

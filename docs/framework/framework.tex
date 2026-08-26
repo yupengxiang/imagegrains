@@ -1,0 +1,355 @@
+% !TeX program = xelatex
+% 核心检测识别程序代码框架 — 自然堆积赛道
+% 编译: latexmk -xelatex framework.tex
+
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+
+\usepackage[a4paper,top=2.2cm,bottom=2.2cm,left=2.15cm,right=2.15cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\captionsetup{font=footnotesize,labelfont=bf,width=0.94\linewidth,justification=raggedright,singlelinecheck=false}
+\graphicspath{{figures/}{../assets/}}
+\setlist{nosep,leftmargin=1.8em}
+\lstset{basicstyle=\small\ttfamily,breaklines=true,frame=single,backgroundcolor=\color{gray!6}}
+\setlength{\emergencystretch}{8em}
+\sloppy
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!55!black,
+  citecolor=green!45!black,
+  urlcolor=blue!65!black,
+  pdftitle={核心检测识别程序代码框架 — 自然堆积赛道},
+  pdfauthor={匿名},
+  breaklinks=true
+}
+
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+\begin{document}
+
+% -------------------- 封面 --------------------
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{2.2cm}
+{\zihao{2}\bfseries 混凝土骨料颗粒智能筛分\par}
+\vspace{0.9cm}
+{\zihao{-0}\bfseries 核心检测识别程序代码框架\par}
+\vspace{0.7cm}
+{\zihao{3} 自然堆积赛道\par}
+\vspace{0.6cm}
+{\zihao{4} 独立说明文档\par}
+\vfill
+{\zihao{4} 匿名提交\par}
+{\zihao{5} 2026年8月\par}
+\vspace{1.2cm}
+\end{titlepage}
+
+% -------------------- 正文 --------------------
+\section{总览}
+
+\begin{itemize}
+  \item \textbf{赛道}：自然堆积，破碎骨料 $5$--$40$~mm，单层/准单层撒料，正俯拍静态图像。
+  \item \textbf{目标}：精细识别（颗粒与背景/粘连分离）、粒径分析（长短径与 $D_{10}/D_{50}/D_{90}$）、形状分类（针片/圆/棱角/普通）、异常检测（$>50$~mm 异物或泥团），现场采集与调试 $\le30$~分钟，一键本地运行。
+  \item \textbf{评分口径}：以标准机械筛分的质量分布为准。本方案在视觉几何与筛分质量语义之间建立显式映射，输出质量代理级配供对标，同时保留数量分布作对照。
+  \item \textbf{设计约束}：复用预训练分割能力，不现场重训；流水线可追溯到单颗粒；不引入新的重型依赖。
+\end{itemize}
+
+\section{框图}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/framework_flow.png}
+\caption{核心检测识别程序流程：灰底为预训练上游能力，暖色为筛分映射，绿色/粉色为形貌/异常分支。主流程自上而下为输入$\rightarrow$分割$\rightarrow$测量$\rightarrow$尺度$\rightarrow$筛分等效$\rightarrow$质量加权$\rightarrow$统计$\rightarrow$场景汇总$\rightarrow$报告/可视化。}
+\label{fig:framework}
+\end{figure}
+
+读图指引：每个框第二行为关键产物文件名或公式，第三行为默认值；上游只做分割与几何，竞赛层完成筛分语义映射与报告。
+
+\section{流水线分步说明}
+
+\subsection{分割 — 精细识别}
+
+\begin{itemize}
+  \item \textbf{模型}：Cellpose-SAM，权重 \code{IG2_full_set_cp_SAM}（约$1.2$~GB），在骨料全集上预训练，现场不重训。
+  \item \textbf{输入输出}：批量读取图像目录，输出 \code{*_pred.tif}（整数掩膜，$0$背景、$1\ldots N$颗粒）与 \code{*_composite.png}（原图与掩膜叠加，供目检粘连与漏检）。
+  \item \textbf{关键参数}：\code{--diameter}（目标粒径px，默认自动）、\code{--min_size}（最小面积px$^2$）、\code{--second_diameter}/\code{--comb_threshold}（可选双尺度合并）。
+  \item \textbf{质检}：另有 \code{*_detection_overview.png} 三联图（原图｜掩膜｜叠加）。
+\end{itemize}
+
+\subsection{几何测量}
+
+\begin{itemize}
+  \item \textbf{方法}：对每个标签区做区域属性提取，再拟合椭圆得到长轴$a$、短轴$b$，同时记录面积$A$、凸包面积$A_{\mathrm{convex}}$、周长$P$（Crofton法）、凸度$\mathrm{solidity}=A/A_{\mathrm{convex}}$、方向、质心等。
+  \item \textbf{过滤}：剔除贴边（\code{edge}阈值）与过小（\code{px_cutoff}）颗粒，可关闭。
+  \item \textbf{产物}：\code{*_pred_grains.csv}，一行一颗粒，含 \code{ell: a-axis (px)}、\code{ell: b-axis (px)}、\code{area}等。
+\end{itemize}
+
+\subsection{尺度换算}
+
+\begin{itemize}
+  \item \textbf{定义}：\code{resolution}为mm/px，$a/b\,(\mathrm{mm})=a/b\,(\mathrm{px})\times\mathrm{resolution}$，面积仍以px$^2$存储（换算时自乘$\mathrm{resolution}^2$）。
+  \item \textbf{获取}：钢尺平放于托盘同平面拍一张，用白尺外框全长$L_{\mathrm{full}}$得$\mathrm{mm/px}=535/L_{\mathrm{full}}$（$500$~mm刻度对应$L_{\text{刻度}}=L_{\mathrm{full}}\times500/535$）；或直接传\code{--resolution 0.208}。输出\code{*_pred_grains_re_scaled.csv}同时含px与mm双列。
+\end{itemize}
+
+\subsection{筛分等效粒径}
+
+\begin{itemize}
+  \item \textbf{公式}：$d=\theta_1 b+\theta_2 d_{\mathrm{eq}}+\theta_3$，其中$d_{\mathrm{eq}}=2\sqrt{A\cdot\mathrm{resolution}^2/\pi}$为面积等效直径。
+  \item \textbf{默认}：$\theta=(1,0,0)$，即$d=b$（短轴），与筛孔通过最相关。
+  \item \textbf{校准接口}：有配对筛分真值时可用差分进化拟合$\theta_1,\theta_2\in[0,3],\theta_3\in[-20,20]$mm；本提交固定短轴基线。
+\end{itemize}
+
+\subsection{质量加权 — 数量到质量}
+
+\begin{itemize}
+  \item \textbf{权重}：$w=d^{\gamma}$，$\gamma=3$。几何相似假设下体积与质量$\propto$尺寸$^3$，归一化后常数消去。
+  \item \textbf{分布}：$F(d)=\sum w\cdot\mathbf{1}(d_i\le d)/\sum w$，阶梯逆得$D_{10}/D_{50}/D_{90}$。
+  \item \textbf{粒级}：按筛孔$5,10,16,20,25,31.5,40$~mm分桶，含边界桶$<5$与$>40$，质量占比$\%$。
+\end{itemize}
+
+\subsection{形状分类}
+
+投影形貌，规则法，阈值可调：
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{ll}
+\toprule
+类别 & 判定 \\
+\midrule
+针片状候选 & $AR=b/a<0.5$ \\
+圆形 & $4\pi A/P^2>0.85$ 且 $\mathrm{solidity}>0.95$ 且 $AR>0.8$ \\
+棱角状 & $4\pi A/P^2<0.6$ 或 $\mathrm{solidity}<0.9$（且非针片） \\
+普通 & 其余 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+优先级 棱角$>$圆形$>$针片$>$普通。
+
+\subsection{异常检测}
+
+\begin{itemize}
+  \item 大块异物：$d>50$~mm
+  \item 过小噪声：$d<5$~mm
+  \item 疑似泥团：$40<d\le50$且$\mathrm{solidity}<0.85$（可关闭 \code{mud_solidity=None}）
+\end{itemize}
+判定顺序 \code{oversized} $>$ \code{suspect_mud} $>$ \code{undersized} $>$ \code{normal}。
+
+\subsection{场景汇总与报告}
+
+\begin{itemize}
+  \item 输出 \code{SceneSummary} 含 \code{percentiles_number_based} vs \code{percentiles_mass_weighted}、\code{mass_fractions}、\code{normal_only}、\code{shape}与\code{anomalies}。
+  \item 提交口径：剔除异常后的正常骨料质量代理分布。
+  \item 落盘：\code{_summary.json}、\code{_report.txt}、\code{_particles_annotated.csv}、\code{_gsd_comparison.png}等。
+\end{itemize}
+
+\section{目录与职责}
+
+\footnotesize
+\begin{verbatim}
+src/imagegrains/                 # 上游，预训练分割与测量
+  __main__.py                    # 串联 分割→测量→尺度→GSD→不确定度
+  segmentation_helper.py         # 模型加载、批量预测、双尺度合并
+  grainsizing.py                 # ell_stats、fit_grain_axes、filter、scale
+  gsd_uncertainty.py             # bootstrap / Monte Carlo
+  data_loader.py                 # 目录扫描与 mask 配对
+
+src/aggregate_screening/         # 竞赛层，筛分语义与报告
+  _columns.py                    # 列名单一来源
+  sieve_equivalent.py            # d/w/分位数/粒级 + 拟合接口
+  scale.py                       # 钢尺自动 mm/px 估计
+  morphology.py                  # 投影形貌规则
+  anomaly.py                     # 异物/噪声/泥团规则
+  report.py                      # SceneSummary 与汇总/落盘
+  visualization.py               # 四任务可视化
+  app.py                         # 一键 CLI 与绘图调度
+  __main__.py                    # python -m aggregate_screening 入口
+
+models/IG2_full_set_cp_SAM       # 预训练权重 1.2GB
+demo_data/samples/               # 演示三张原图
+demo_data/samples/results/       # 已跑通结果 48文件 75MB
+tests/                           # 合成数据一致性测试
+\end{verbatim}
+\normalsize
+
+\section{数据契约}
+
+\textbf{输入}：图像目录，\code{jpg/png/tif}均可；可选同名\code{*_mask.tif}。
+
+\textbf{中间产物}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{ll}
+\toprule
+文件 & 内容 \\
+\midrule
+\code{*_pred.tif} & 实例掩膜 \\
+\code{*_composite.png} & 叠加目检图 \\
+\code{*_pred_grains.csv} & 逐颗粒明细（px） \\
+\code{*_pred_grains_re_scaled.csv} & 追加a/b~(mm)双列 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{CSV列（节选）}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{ll}
+\toprule
+列 & 含义 \\
+\midrule
+\code{ell: a-axis (px/mm)} & 椭圆长轴 \\
+\code{ell: b-axis (px/mm)} & 椭圆短轴 \\
+\code{area} & 面积 px$^2$ \\
+\code{area_convex} & 凸包面积 px$^2$ \\
+\code{perimeter_crofton} & 周长 px \\
+\code{convexity / solidity} & 凸度 $A/A_{\mathrm{convex}}$ \\
+\code{orientation} & 方向角 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+竞赛层标准化后为 \code{b_mm / a_mm / area_px / d_eq_mm / __resolution}。
+
+\textbf{输出（每场景）}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{ll}
+\toprule
+文件 & 用途 \\
+\midrule
+\code{*_summary.json} & 结构化汇总 \\
+\code{*_report.txt} & 人读报告 \\
+\code{*_particles_annotated.csv} & 明细 + 形貌/异常列 \\
+\code{*_gsd_comparison.png} & 数量 vs 质量对比 \\
+\code{*_detection_overview.png} & 任务1 三联图 \\
+\code{*_axes_overlay.png} & 任务2 长短轴 + 比例尺 \\
+\code{*_shape_*.png} & 任务3 四形态分图 \\
+\code{*_anomaly_*.png} & 任务4 有则出图 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{关键接口}
+
+\begin{lstlisting}[language=Python,caption={标准化与汇总}]
+from aggregate_screening.sieve_equivalent import load_grains_csv, infer_resolution, normalize_grains
+from aggregate_screening.report import scene_summary
+
+df = load_grains_csv("demo/*_re_scaled.csv", resolution=None)  # 自动推断 0.208
+res = infer_resolution(df)
+dfn = normalize_grains(df, res)
+
+summary, df_final = scene_summary(dfn, resolution=res, scene_id="agg_001",
+                                   theta=(1,0,0), gamma=3.0)
+# summary.percentiles_mass_weighted["D50"]
+# summary.mass_fractions
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={拟合接口（当前未执行）}]
+from aggregate_screening.sieve_equivalent import fit_calibration
+res = fit_calibration(batches=[{"b_mm":..., "area_px":..., "resolution":0.208}],
+                      targets=[(d10,d50,d90)])
+# res.theta / res.gamma / res.success
+\end{lstlisting}
+
+\section{运行方式}
+
+\begin{lstlisting}[language=bash]
+# 环境
+conda create -n imagegrains -c conda-forge python=3.10 -y
+conda activate imagegrains
+pip install -e '.[test]'
+
+# 模型（1.2GB）
+curl -sL --retry 5 -o models/IG2_full_set_cp_SAM \
+  https://zenodo.org/records/15728186/files/IG2_full_set_cp_SAM
+
+# 第1步 分割与测量（GPU 约 17s + 9s / 张）
+python -m imagegrains --img_dir demo_data/samples --model_dir models \
+  --out_dir demo_data/samples/demo --resolution 0.208 --gpu True
+
+# 第2步 筛分分析（<1s / 张）
+python -m aggregate_screening --grains demo_data/samples/demo/*_re_scaled.csv \
+  --out_dir demo_data/samples/demo/report
+
+# 已跑通结果免重复
+ls demo_data/samples/results/
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{常用参数}
+\footnotesize
+\begin{tabular}{lll}
+\toprule
+参数 & 默认 & 说明 \\
+\midrule
+\code{--resolution} & --- & mm/px，re\_scaled可省略 \\
+\code{--theta} & \code{1,0,0} & $\theta_1,\theta_2,\theta_3$ \\
+\code{--gamma} & $3.0$ & 3 体积加权，2 面积加权 \\
+\code{--diameter} & 自动 & Cellpose目标直径px \\
+\code{--min_size} & $0$ & 最小面积px$^2$ \\
+\code{--no_plot} & 关 & 不生成对比图 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{复现证据}
+
+三张演示图已提交于 \code{demo_data/samples/results/}：
+
+\begin{table}[H]
+\centering
+\caption{三样本质量代理级配（固定$\theta=(1,0,0),\gamma=3$）}
+\footnotesize
+\begin{tabular}{lcccc}
+\toprule
+场景 & 颗粒数 & 正常骨料 & $D_{10}/D_{50}/D_{90}$ & 主粒级 \\
+\midrule
+\code{agg\_005} 粗 & $968$ & $703$ & $15.6/27.5/38.0$~mm & $25$--$31.5$~mm $29.7\%$ \\
+\code{agg\_001} 中 & $1924$ & $1193$ & $11.1/23.6/30.6$~mm & $25$--$31.5$~mm $34.2\%$ \\
+\code{agg\_029} 细 & $966$ & $520$ & $6.7/14.6/30.6$~mm & $5$--$10$~mm $32.7\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+合计$3858$颗，三组级配可区分。数量口径$D_{50}\,5.2$--$7.6$~mm与质量代理$D_{50}\,14.1$--$27.5$~mm差异即为``计数 vs 筛分质量语义需单独建模''的证据。
+
+\section{质量保障}
+
+\begin{itemize}
+  \item 合成测试：\code{pytest} 27 passed。
+  \item 目视质检：\code{*_composite.png}查粘连，\code{*_axes_overlay.png}比例尺可读，\code{*_gsd_comparison.png}数量vs质量对照。
+  \item 三层质检：采集层（视场/曝光/清晰度/参考物）$\rightarrow$实例层（merge/split/截断/漏检）$\rightarrow$物理/报告层（尺度/轴长/粒级/文件关联）。
+\end{itemize}
+
+\section{边界说明}
+
+\begin{itemize}
+  \item 本提交固定短轴基线与$\gamma=3$体积先验，未做筛分真值拟合；拟合接口保留供后续自采数据校准。
+  \item 投影形貌为二维规则，非三维量规等价；疑似泥团为几何候选，非材料分类器。
+  \item 约$27$~s/张为算法阶段时序，非$30$~min现场全流程实测。
+\end{itemize}
+
+\end{document}

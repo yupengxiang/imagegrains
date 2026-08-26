@@ -57,3 +57,12 @@ demo_data/test_out
 !docs/slide/figures/*.pdf
 !docs/slide/*.tex
 !docs/slide/*.pdf
+!docs/device/
+!docs/device/*.tex
+!docs/device/*.pdf
+!docs/framework/
+!docs/framework/*.tex
+!docs/framework/*.pdf
+!docs/framework/figures/
+!docs/framework/figures/*.png
+!docs/framework/figures/*.pdf

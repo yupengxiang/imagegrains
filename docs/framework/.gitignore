@@ -11,6 +11,7 @@
 *.nav
 *.snm
 *.vrb
+*.pdf
 *.swp
 *~
 .DS_Store

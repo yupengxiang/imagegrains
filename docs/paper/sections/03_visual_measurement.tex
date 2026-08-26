@@ -5,7 +5,7 @@
 
 \subsection{成像条件与尺度标定}
 
-成像环节需要同时保证颗粒边界可辨识和像素几何可转换为毫米几何。现场采用固定俯视相机、低反光背景和漫射照明，以减少硬阴影、运动模糊和透视缩放差异。相机高度或焦距改变后重新标定尺度；若参考长度 $L_{\mathrm{ref}}$ 在图像中占据 $l_{\mathrm{ref}}$ 像素，则
+成像环节需要同时保证颗粒边界可辨识和像素几何可转换为毫米几何。现场采用固定俯视相机、低反光背景和漫射照明，以减少硬阴影、运动模糊和透视缩放差异。相机高度或焦距改变后需重新标定尺度；若参考长度 $L_{\mathrm{ref}}$ 在图像中占据 $l_{\mathrm{ref}}$ 像素，则
 \begin{equation}
  r=\frac{L_{\mathrm{ref}}}{l_{\mathrm{ref}}}\quad (\mathrm{mm/px}).
 \label{eq:r-scale}
@@ -21,34 +21,37 @@
 
 \subsection{基于 Cellpose-SAM 的实例分割}
 
-自然堆积骨料需要实例分割而非单纯前景分割。每个颗粒只有对应独立 mask 后，长短轴、面积和质量代理权重才具有明确对象。本文复用 ImageGrains 2.0 提供的 Cellpose-SAM 颗粒预训练模型\cite{mair2026imagegrains2,pachitariu2025cellposeSAM}，直接获得整数实例 mask 并继续进行几何测量和人工质检。预训练模型承担通用颗粒边界识别，本文工作的重点是把这些实例接入物理尺度、筛分等效粒径与质量代理级配。
+自然堆积骨料需要实例分割而非单纯前景分割。每个颗粒只有对应独立 mask 后，长短轴、面积和质量代理权重才具有明确对象。本文基于 ImageGrains 2.0 提供的 Cellpose-SAM 颗粒预训练模型\cite{mair2026imagegrains2,pachitariu2025cellposeSAM}，获得整数实例 mask 并继续进行几何测量和人工质检。预训练模型承担通用颗粒边界识别，随后的流程负责将这些实例接入物理尺度、筛分等效粒径与质量代理级配。
 
-图\ref{fig:r-visual-chain}给出同一真实样本从原图到实例结果再到几何轴线的测量链。原图记录自然堆积状态，实例叠加图显示模型划分出的独立颗粒，轴线图则对应后续毫米长短轴的测量位置。三层结果保留了从场景级统计向上追溯的路径：当 $D_{50}$ 或某一筛级比例出现异常时，可以检查尺度、实例边界和具体几何量，而不只看到最终级配曲线。
+图\ref{fig:r-visual-chain}给出同一真实样本从原图到实例掩膜再到几何轴线的测量链。原图记录自然堆积状态，实例掩膜（纯掩膜视图）显示模型划分出的独立颗粒，轴线图在实例分割叠加（原图+彩色掩膜，$48\%$ 融合）基础上以白描边加粗绘制长短轴，对应后续毫米几何的测量位置。三图同视场、同尺寸 $3024\times4032$ 等大排布，三层结果保留了从场景级统计向上追溯的路径：当 $D_{50}$ 或某一筛级比例出现异常时，可以检查尺度、实例边界和具体几何量，而不只看到最终级配曲线。
 
 \begin{figure}[t]
 \centering
-\begin{subfigure}{0.31\linewidth}
+\begin{subfigure}{0.32\linewidth}
 \centering
-\includegraphics[width=\linewidth]{agg_001.jpg}
+\includegraphics[width=\linewidth]{fig3a_original.jpg}
 \caption{原始自然堆积图像}
+\label{fig:r-visual-a}
 \end{subfigure}\hfill
-\begin{subfigure}{0.31\linewidth}
+\begin{subfigure}{0.32\linewidth}
 \centering
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_detection_overview.png}
-\caption{实例与粒径概览}
+\includegraphics[width=\linewidth]{fig3b_mask.png}
+\caption{实例掩膜}
+\label{fig:r-visual-b}
 \end{subfigure}\hfill
-\begin{subfigure}{0.31\linewidth}
+\begin{subfigure}{0.32\linewidth}
 \centering
-\includegraphics[width=\linewidth]{agg_001_IG2_full_set_cp_SAM_pred_grains_re_scaled_axes_overlay.png}
+\includegraphics[width=\linewidth]{fig3c_axes.jpg}
 \caption{长短轴几何叠加}
+\label{fig:r-visual-c}
 \end{subfigure}
-\caption{从原始图像到毫米几何量的视觉证据链。三个面板依次对应观测场景、实例对象和物理测量。}
+\caption{从原始图像到毫米几何量的视觉证据链（同视场、等尺寸 $3024\times4032$）。(a)观测场景；(b)实例掩膜（纯掩膜视图）；(c)实例分割叠加上的物理测量（青/红长短轴，白描边加粗）。}
 \label{fig:r-visual-chain}
 \end{figure}
 
-现场质检优先检查会改变级配结构的实例错误。大面积 merge 会产生过大的 $d_i$，单颗粒 split 会制造多个偏小实例；质量代理权重又随粒径幂次增长，因此粗尺度 merge 对高分位数尤其敏感。漏检的影响取决于缺失颗粒的尺寸结构：主要漏掉小颗粒时，数量低分位会偏粗；粗颗粒因遮挡只保留局部轮廓时，其个体尺寸又可能被低估。本文没有人工实例掩膜，实例叠加图用于确认处理对象、测量来源和结构性失败，不据此计算 P/R/F1 等外部精度指标。
+现场质检优先检查会改变级配结构的实例错误。大面积 merge 会产生过大的 $d_i$，单颗粒 split 会制造多个偏小实例；质量代理权重又随粒径幂次增长，因此粗尺度 merge 对高分位数尤其敏感。漏检的影响取决于缺失颗粒的尺寸结构：主要漏掉小颗粒时，数量低分位会偏粗；粗颗粒因遮挡只保留局部轮廓时，其个体尺寸又可能被低估。本文没有人工实例掩膜，实例掩膜视图仅用于确认处理对象、测量来源和结构性失败，不据此计算需人工真值逐实例匹配的外部精度指标，如 Precision（精确率，P，预测为正中真实为正的比例）、Recall（召回率，R，真实为正中被预测为正的比例）及 F1 分数（F1-score，精确率与召回率的调和平均）。
 
-现场运行采用固定的分割模型和主要配置，并通过标准化成像尽量减少域偏移。最终级配是否符合经验预期不作为临时调节模型的依据。这样处理后，异常结果可以沿“输入图像--实例边界--毫米几何--级配统计”逐层排查，测试场景也不会转化为临时训练数据。
+现场运行采用固定的分割模型和主要配置，并通过标准化成像尽量减少域偏移。最终级配是否符合经验预期不作为临时调节模型的依据。通过该处理链路，异常结果可以沿“输入图像--实例边界--毫米几何--级配统计”逐层排查，测试场景也不会转化为临时训练数据。
 
 \subsection{颗粒几何与任务特征}
 
@@ -72,7 +75,7 @@
 \label{tab:r-features}
 \footnotesize
 \renewcommand{\arraystretch}{1.12}
-\begin{tabular}{>{\centering\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.4cm}}
+\begin{tabular}{>{\centering\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{7.0cm}}
 \toprule
 特征 & 含义 & 主要用途 \\
 \midrule

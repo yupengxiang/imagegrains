@@ -13,7 +13,7 @@
 \label{tab:r-hardware}
 \footnotesize
 \renewcommand{\arraystretch}{1.12}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{6.5cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.0cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{7.0cm}}
 \toprule
 模块 & 推荐条件 & 现场作用 \\
 \midrule
@@ -31,7 +31,7 @@
 
 \subsection{30 min 操作流程}
 
-表\ref{tab:r-sop}给出面向赛题 30~min 约束的现场时间预算。约 27~s/张的历史算法时序只覆盖计算阶段，完整操作还需要设备就位、尺度确认、图像质检、模型加载、结果复核和一次失败恢复。时间预算因此把较大余量留给这些会直接影响测量可信度的环节。
+表\ref{tab:r-sop}给出面向赛题 30~min 约束的现场时间预算。约 27~s/张的历史算法时序只覆盖计算阶段，完整操作还需要设备就位、尺度确认、图像质检、模型加载、结果复核和一次失败恢复。
 
 \begin{table}[H]
 \centering
@@ -39,7 +39,7 @@
 \label{tab:r-sop}
 \footnotesize
 \renewcommand{\arraystretch}{1.12}
-\begin{tabular}{>{\centering\arraybackslash}p{0.9cm}>{\raggedright\arraybackslash}p{3.1cm}>{\centering\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{7.4cm}}
+\begin{tabular}{>{\centering\arraybackslash}p{0.9cm}>{\raggedright\arraybackslash}p{3.5cm}>{\centering\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{7.4cm}}
 \toprule
 步骤 & 操作 & 预算 & 完成判据 \\
 \midrule
@@ -65,7 +65,7 @@
 \label{tab:r-recovery}
 \footnotesize
 \renewcommand{\arraystretch}{1.1}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{6.5cm}>{\raggedright\arraybackslash}p{7.0cm}}
 \toprule
 失败信号 & 优先检查 & 恢复原则 \\
 \midrule
@@ -78,7 +78,7 @@ $D_p$ 突然偏粗 & merge、极端异常、质量权重输入错误 & 向上追
 \end{tabular}
 \end{table}
 
-当大部分颗粒严重遮挡、参考物无法建立可信尺度，或实例结果出现固定流程无法恢复的大面积错误时，场景不进入主级配统计。这个门槛把“算法能够输出数字”和“输入条件足以支持测量”分开，避免在证据不足的场景上继续叠加后处理。
+当大部分颗粒严重遮挡、参考物无法建立可信尺度，或实例结果出现固定流程无法恢复的大面积错误时，场景不进入主级配统计，避免在证据不足的场景上继续叠加后处理。
 
 \subsection{结果包与可追溯性}
 
@@ -94,7 +94,7 @@ $D_p$ 突然偏粗 & merge、极端异常、质量权重输入错误 & 向上追
 \label{tab:r-limits}
 \footnotesize
 \renewcommand{\arraystretch}{1.1}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{5.3cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}p{5.7cm}>{\raggedright\arraybackslash}p{7.0cm}}
 \toprule
 边界 & 主要影响 & 本文采用的处理方式 \\
 \midrule

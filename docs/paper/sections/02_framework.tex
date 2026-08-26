@@ -3,7 +3,7 @@
 \section{总体框架与技术路线}
 \label{sec:r-framework}
 
-技术路线需要同时满足三项约束：分离自然堆积中的接触颗粒，减少现场重新标注训练，并让最终输出由可解释的物理量和统计规则生成。传统阈值/分水岭实现简单，但对背景、阴影和弱接触边界敏感；监督式实例分割能够针对赛题训练，却依赖代表性实例标注并面临现场域变化；多视角或深度方案可恢复更多三维信息，但会增加设备、标定和布置复杂度。预训练颗粒实例模型已经具备较强的通用边界识别能力，赛题特有的毫米尺度与级配语义则可以放在下游显式建模。基于这一分工，本文采用 ImageGrains 2.0 / Cellpose-SAM 作为上游实例分割基座\cite{stringer2021cellpose,pachitariu2025cellposeSAM,mair2026imagegrains2}。
+报告的技术路线同时满足了三项约束：分离自然堆积中的接触颗粒，减少现场重新标注训练，并让最终输出由可解释的物理量和统计规则生成。传统阈值/分水岭实现简单，但对背景、阴影和弱接触边界敏感；监督式实例分割能够针对赛题训练，却依赖代表性实例标注并面临现场域变化；多视角或深度方案可恢复更多三维信息，但会增加设备、标定和布置复杂度。预训练颗粒实例模型已经具备较强的通用边界识别能力，赛题特有的毫米尺度与级配语义则可以放在下游显式建模。基于这一分工，本文采用 ImageGrains 2.0 / Cellpose-SAM 作为上游实例分割基座\cite{stringer2021cellpose,pachitariu2025cellposeSAM,mair2026imagegrains2}。
 
 \begin{table}[t]
 \centering
@@ -16,37 +16,102 @@
 路线 & 接触颗粒 & 数据/现场成本 & 本文判断 \\
 \midrule
 阈值/分水岭 & 强粘连易 merge/split & 低，但参数依赖场景 & 适合作为受控条件基线 \\
-监督式实例分割 & 可学习复杂边界 & 实例标注和训练成本较高 & 有数据时可增强，但不作为现场依赖 \\
+监督式实例分割 & 可学习复杂边界 & 实例标注成本较高 & 可增强，但不作为现场依赖 \\
 预训练颗粒实例模型 & 直接输出实例轮廓 & 可零样本部署 & 作为主感知基座 \\
-多视角/深度/点云 & 可恢复部分第三维 & 标定、硬件和部署成本高 & 物理信息更丰富，但不作为当前主路线 \\
+多视角/深度/点云 & 可恢复部分第三维 & 标定、硬件成本高 & 物理信息更丰富，但成本高 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-系统采用单向、可追溯的数据链，如图\ref{fig:r-architecture}。处理从图像和尺度参考出发，依次得到实例掩膜、毫米级几何量、筛分等效粒径和质量代理级配；形貌与异常由同一组颗粒几何并行计算，最后汇总为场景级报告。本文结果统一使用固定的 $\boldsymbol{\theta}=(1,0,0)$ 和 $\gamma=3$，运行过程中不根据最终级配反向调整参数。代码层保留外部机械筛分数据可用时重新估计 $\boldsymbol{\theta}$ 与 $\gamma$ 的接口，但该接口不参与本文结果计算。
+系统采用单向、可追溯的数据链，如图\ref{fig:r-architecture}。处理从图像和尺度参考出发，依次得到实例掩码、毫米级几何量、筛分等效粒径和质量代理级配；形貌与异常由同一组颗粒几何并行计算，最后汇总为场景级报告。本文结果统一使用固定的 $\boldsymbol{\theta}=(1,0,0)$ 和 $\gamma=3$，运行过程中不根据最终级配反向调整参数。代码层保留外部机械筛分数据可用时重新估计 $\boldsymbol{\theta}$ 与 $\gamma$ 的接口，但该接口不参与本文结果计算。
 
 \begin{figure}[t]
 \centering
+\captionsetup{width=0.9\linewidth}
+
 \begin{tikzpicture}[
-  node distance=0.55cm and 0.42cm,
-  block/.style={rectangle,draw,rounded corners,minimum height=0.85cm,minimum width=2.25cm,align=center,font=\footnotesize},
-  small/.style={rectangle,draw,rounded corners,minimum height=0.68cm,minimum width=2.0cm,align=center,font=\scriptsize},
+  node distance=0.75cm,
+  block/.style={
+    rectangle,
+    draw,
+    rounded corners,
+    minimum height=0.85cm,
+    minimum width=2.25cm,
+    align=center,
+    font=\footnotesize
+  },
+  small/.style={
+    rectangle,
+    draw,
+    rounded corners,
+    minimum height=0.68cm,
+    minimum width=2.0cm,
+    align=center,
+    font=\scriptsize
+  },
   arr/.style={->,thick}
 ]
-\node[block,fill=blue!7] (img) {图像采集\\尺度参考};
-\node[block,fill=blue!7,right=of img] (seg) {实例分割\\$I\to\{M_i\}$};
-\node[block,fill=green!7,right=of seg] (geo) {物理测量\\$\{M_i\}\to\mathbf{x}_i$};
-\node[block,fill=orange!8,right=of geo] (map) {筛分映射\\$d_i,w_i$};
-\node[small,fill=orange!8,below=0.75cm of map] (grade) {质量代理级配\\$D_p,P_k$};
-\node[small,fill=purple!7,left=0.45cm of grade] (shape) {投影形貌\\$c_i$};
-\node[small,fill=red!6,right=0.45cm of grade] (anom) {异常候选\\$z_i$};
-\node[block,fill=gray!8,below=0.75cm of grade] (report) {场景级报告\\表格、曲线、可视化};
-\draw[arr] (img)--(seg); \draw[arr] (seg)--(geo); \draw[arr] (geo)--(map);
-\draw[arr] (map)--(grade); \draw[arr] (geo.south)|-(shape.west); \draw[arr] (geo.south)|-(anom.west);
-\draw[arr] (shape)--(report); \draw[arr] (grade)--(report); \draw[arr] (anom)--(report);
+
+% -------- 主数据流 --------
+\node[block,fill=blue!7] (img)
+  {图像采集\\尺度参考};
+
+\node[block,fill=blue!7,right=0.65cm of img] (seg)
+  {实例分割\\$I\to\{M_i\}$};
+
+\node[block,fill=green!7,right=0.65cm of seg] (geo)
+  {物理测量\\$\{M_i\}\to\mathbf{x}_i$};
+
+\node[block,fill=orange!8,right=0.65cm of geo] (map)
+  {筛分映射\\$d_i,w_i$};
+
+% -------- 下游三个任务输出 --------
+% 投影形貌和异常候选均直接来自物理测量
+\node[small,fill=purple!7,
+      below left=0.90cm and 1.35cm of geo,xshift=1.5cm] (shape)
+  {投影形貌\\$c_i$};
+
+\node[small,fill=red!6,
+      right=0.45cm of shape] (anom)
+  {异常候选\\$z_i$};
+
+% 质量代理级配来自筛分映射
+\node[small,fill=orange!8,
+      below=0.90cm of map] (grade)
+  {质量代理级配\\$D_p,P_k$};
+
+% -------- 场景级汇总 --------
+\node[block,fill=gray!8,
+      below=1.00cm of anom,
+      xshift=0.0cm] (report)
+  {场景级报告\\表格、曲线、可视化};
+
+% -------- 箭头 --------
+\draw[arr] (img) -- (seg);
+\draw[arr] (seg) -- (geo);
+\draw[arr] (geo) -- (map);
+
+% 物理测量直接分出形貌和异常两支
+\draw[arr] (geo.south) -- (shape.north);
+\draw[arr] (geo.south) -- (anom.north);
+
+% 筛分映射得到质量代理级配
+\draw[arr] (map.south) -- (grade.north);
+
+% 三类输出汇总为场景级报告
+\draw[arr] (shape.south) -- (report.north west);
+\draw[arr] (anom.south) -- (report.north);
+\draw[arr] (grade.south) -- (report.north east);
+
 \end{tikzpicture}
-\caption{本文采用的主数据流。上游实例结果统一进入毫米几何表，下游级配、形貌和异常输出共享同一组可追溯颗粒特征。}
+
+\caption{
+本文采用的主数据流。实例分割结果经尺度恢复形成毫米级颗粒几何；
+物理测量结果直接用于投影形貌与异常候选分析，同时经筛分映射形成质量代理级配，
+三类任务输出最终汇总为可追溯的场景级报告。
+}
 \label{fig:r-architecture}
+
 \end{figure}
 
 这种结构把不同来源的误差保留在可检查的位置。预训练模型负责实例边界，标准化成像和尺度参考决定毫米量，筛分等效粒径与质量代理模型决定统计口径；出现异常结果时，可以沿这三层逐级定位，而不必把误差吸收到一个端到端黑箱中。现场推理只需要单目成像、尺度校验和固定配置计算，主要时间可以用于图像质检和失败恢复。与直接从图像回归级配曲线的方法相比\cite{coenen2022learningToSieve,buscombe2020sedinet}，这一结构减少了模型自由度，同时保留逐颗粒物理解释和较低的现场数据依赖。

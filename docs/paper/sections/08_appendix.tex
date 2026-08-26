@@ -11,7 +11,7 @@
 \label{tab:r-appendix-params}
 \footnotesize
 \renewcommand{\arraystretch}{1.12}
-\begin{tabular}{>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{4.6cm}}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{5.0cm}>{\raggedright\arraybackslash}p{6.5cm}}
 \toprule
 项目 & 当前设置 & 说明 \\
 \midrule
@@ -29,6 +29,6 @@
 \end{tabular}
 \end{table}
 
-每个场景的最小复现结果包包括原始图像与尺度信息、integer instance mask、实例/轴长可视化、逐颗粒 CSV、场景级 summary、级配曲线以及形貌/异常可视化。逐颗粒表保存长短轴、面积、周长、等效直径、筛分等效粒径、质量代理权重和规则标签，因此场景级 $D_p$ 与筛级占比可以在不重新执行分割模型的情况下重新计算。
+每个场景的最小复现结果包括原始图像与尺度信息、integer instance mask、实例/轴长可视化、逐颗粒 CSV、场景级 summary、级配曲线以及形貌/异常可视化。逐颗粒表保存长短轴、面积、周长、等效直径、筛分等效粒径、质量代理权重和规则标签，因此场景级 $D_p$ 与筛级占比可以在不重新执行分割模型的情况下重新计算。
 
-正文使用的三张演示样本为 \texttt{agg\_001}、\texttt{agg\_005} 和 \texttt{agg\_029}。报告中的实例数、$D_{10}/D_{50}/D_{90}$、形貌比例和异常数量均直接来自这三组现有产物。
+正文使用的三张演示样本为样本 A、B、C（图\ref{fig:r-three-gsd-a}--图\ref{fig:r-three-gsd-c}，表\ref{tab:r-demo-main}；按粗到细排序。报告中的实例数、$D_{10}/D_{50}/D_{90}$、形貌比例和异常数量均直接来自这三组现有产物。
